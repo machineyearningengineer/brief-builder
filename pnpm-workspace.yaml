@@ -4,3 +4,5 @@ allowBuilds:
   msgpackr-extract: set this to true or false
   sharp: true
   workerd: true
+minimumReleaseAgeExclude:
+  - cf@1.0.0-beta.21
