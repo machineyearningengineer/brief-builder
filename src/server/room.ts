@@ -14,6 +14,7 @@ import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
 import { closestCorrections, correctionsBlock, type Correction } from "./corrections.ts"
 import { guardEvidence } from "./guards.ts"
+import { readPhotos } from "./photo-reader.ts"
 
 const PROFILES = {
   braider: { profile: braiderProfile, tags: braiderTags, seedCorrections: braiderCorrections },
@@ -28,6 +29,9 @@ const DM_PER_ROOM_WINDOW = 60 // past this, DMs land undrafted
 const DM_ROOM_HARD_CAP = 300 // past this, DMs from ids the room hasn't seen are refused
 const DM_ROOM_ABSOLUTE_CAP = 600 // past this, every DM is refused for the rest of the window
 const DM_WINDOW_MS = 10 * 60_000
+const MAX_IMAGES_PER_DM = 4
+const IMAGES_PER_WINDOW = 16
+const MAX_IMAGE_BYTES = 1_500_000
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // What a client's phone may see of a message: their words, its status and the stylist's reply.
@@ -46,6 +50,10 @@ export class StylistRoom extends DurableObject<Env> {
       corrections_used INTEGER, guarded TEXT)`)
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS corrections (id TEXT PRIMARY KEY, json TEXT, created_at INTEGER)`)
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)`)
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, client_id TEXT, mime TEXT, bytes BLOB, created_at INTEGER)`)
+    // Rooms created before photos existed get the column in place.
+    const cols = ctx.storage.sql.exec(`PRAGMA table_info(messages)`).toArray().map((c) => c.name)
+    if (!cols.includes("images")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN images TEXT`)
     const row = ctx.storage.sql.exec(`SELECT value FROM meta WHERE key = 'stylist'`).toArray()[0]
     if (row) this.stylist = row.value as StylistKey
   }
@@ -55,7 +63,7 @@ export class StylistRoom extends DurableObject<Env> {
   // and sees only their own thread: their messages and the stylist's replies, never briefs.
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
-    const [, , , stylist, action] = url.pathname.split("/") // /api/room/<stylist>/<action>
+    const [, , , stylist, action, itemId] = url.pathname.split("/") // /api/room/<stylist>/<action>[/<id>]
     this.remember(stylist as StylistKey)
     // The key never travels in a URL: HTTP sends it as x-stylist-token, and a browser
     // WebSocket (which can't set headers) offers it as a "key.<token>" subprotocol.
@@ -77,6 +85,8 @@ export class StylistRoom extends DurableObject<Env> {
       if (!CLIENT_ID.test(client)) return new Response("Unknown client", { status: 401 })
       return Response.json({ messages: this.messages().filter((m) => m.clientId === client).map(clientView) })
     }
+    if (action === "image" && request.method === "GET") return this.serveImage(itemId ?? "", isStylist, client)
+    if (action === "image" && request.method === "POST") return this.receiveImage(request, client)
     if (request.method !== "POST") return new Response("Not found", { status: 404 })
     const body: any = await request.json().catch(() => ({}))
     if (action === "dm") return this.receiveDm(body)
@@ -128,9 +138,11 @@ export class StylistRoom extends DurableObject<Env> {
 
   private save(m: RoomMessage) {
     this.ctx.storage.sql.exec(
-      `INSERT OR REPLACE INTO messages VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO messages (id, client_id, created_at, received_at, text, photo, status, brief, corrected, changed,
+        reply, request_id, ms, corrections_used, guarded, images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       m.id, m.clientId, m.createdAt, m.receivedAt, m.text, JSON.stringify(m.photoTags), m.status, JSON.stringify(m.brief),
       JSON.stringify(m.corrected), JSON.stringify(m.changed), m.reply, m.requestId, m.ms, m.correctionsUsed, JSON.stringify(m.guarded),
+      JSON.stringify(m.images),
     )
     this.broadcast({ type: "message", message: m })
   }
@@ -140,10 +152,13 @@ export class StylistRoom extends DurableObject<Env> {
     return [...parseJsonl(PROFILES[this.stylist!].seedCorrections), ...live]
   }
 
-  private async receiveDm(body: { clientId?: string; text?: string; photoTags?: RoomMessage["photoTags"] }) {
+  private async receiveDm(body: { clientId?: string; text?: string; imageIds?: unknown }) {
     const text = String(body.text ?? "").trim().slice(0, MAX_DM)
-    if (!text) return Response.json({ error: "A message needs text." }, { status: 400 })
     if (!CLIENT_ID.test(String(body.clientId ?? ""))) return Response.json({ error: "Unknown client." }, { status: 400 })
+    // Only photos this phone uploaded can be attached.
+    const wanted = Array.isArray(body.imageIds) ? body.imageIds.filter((x): x is string => typeof x === "string").slice(0, MAX_IMAGES_PER_DM) : []
+    const images = wanted.filter((id) => this.ctx.storage.sql.exec(`SELECT 1 FROM images WHERE id = ? AND client_id = ?`, id, body.clientId).toArray().length > 0)
+    if (!text && !images.length) return Response.json({ error: "Write a message or add a photo." }, { status: 400 })
     // Each DM costs a Mubit call, so one phone can send a few per window, not a flood.
     // One phone past its limit is refused. Past the room-wide cap (client ids are self-chosen)
     // DMs are still accepted and shown to the stylist, just not drafted, so a flood caps the
@@ -166,10 +181,9 @@ export class StylistRoom extends DurableObject<Env> {
       if (!known) return Response.json({ error: "The stylist's inbox is full right now. Try again in a few minutes." }, { status: 429 })
     }
     const draft = roomRecent < DM_PER_ROOM_WINDOW
-    const photoTags = cleanPhotoTags(body.photoTags)
     const m: RoomMessage = {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
-      receivedAt: londonTimestamp(new Date()), text, photoTags, status: draft ? "drafting" : "failed",
+      receivedAt: londonTimestamp(new Date()), text, photoTags: null, images, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [],
     }
     this.save(m)
@@ -179,6 +193,16 @@ export class StylistRoom extends DurableObject<Env> {
 
   private async draft(m: RoomMessage) {
     const { profile, tags } = PROFILES[this.stylist!]
+    // Photos are read into tags first (through Mubit, like every model call); the brief model
+    // only ever sees the tags, never the image.
+    if (m.images.length) {
+      const photos = m.images.flatMap((id) => {
+        const r = this.ctx.storage.sql.exec(`SELECT mime, bytes FROM images WHERE id = ?`, id).toArray()[0]
+        return r ? [{ mime: r.mime as string, bytes: r.bytes as ArrayBuffer }] : []
+      })
+      m = { ...m, photoTags: await readPhotos({ key: this.env.MUBIT_API_KEY, tags: tags as any, photos }).catch(() => null) }
+      this.save(m)
+    }
     const used = closestCorrections(m.text, this.correctionPool())
     const result = await callBrief({
       key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low",
@@ -220,24 +244,46 @@ export class StylistRoom extends DurableObject<Env> {
     return Response.json({ ok: true })
   }
 
+  // Photos arrive already resized on the phone. Only real JPEG, PNG or WebP bytes are kept.
+  private async receiveImage(request: Request, client: string) {
+    if (!CLIENT_ID.test(client)) return Response.json({ error: "Unknown client." }, { status: 400 })
+    const recent = Number(this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM images WHERE client_id = ? AND created_at > ?`, client, Date.now() - DM_WINDOW_MS).toArray()[0]?.n ?? 0)
+    if (recent >= IMAGES_PER_WINDOW) return Response.json({ error: "That's a lot of photos. Try again in a few minutes." }, { status: 429 })
+    const declared = Number(request.headers.get("content-length") ?? 0)
+    if (declared > MAX_IMAGE_BYTES) return Response.json({ error: "That photo is too large." }, { status: 413 })
+    const bytes = await request.arrayBuffer()
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) return Response.json({ error: "That photo is too large." }, { status: 413 })
+    const mime = sniffImage(new Uint8Array(bytes.slice(0, 12)))
+    if (!mime) return Response.json({ error: "Only photos can be attached." }, { status: 415 })
+    const id = crypto.randomUUID()
+    this.ctx.storage.sql.exec(`INSERT INTO images (id, client_id, mime, bytes, created_at) VALUES (?, ?, ?, ?, ?)`, id, client, mime, bytes, Date.now())
+    return Response.json({ id })
+  }
+
+  // The sender and the stylist can see a photo; nobody else can.
+  private serveImage(id: string, isStylist: boolean, client: string) {
+    const r = this.ctx.storage.sql.exec(`SELECT client_id, mime, bytes FROM images WHERE id = ?`, id).toArray()[0]
+    if (!r || (!isStylist && r.client_id !== client)) return new Response("Not found", { status: 404 })
+    return new Response(r.bytes as ArrayBuffer, {
+      headers: { "content-type": r.mime as string, "cache-control": "private, max-age=3600", "x-content-type-options": "nosniff" },
+    })
+  }
+
   private reset() {
     this.ctx.storage.sql.exec(`DELETE FROM messages`)
     this.ctx.storage.sql.exec(`DELETE FROM corrections`)
+    this.ctx.storage.sql.exec(`DELETE FROM images`)
     this.broadcast({ type: "reset" })
     return Response.json({ ok: true })
   }
 }
 
-// Photo tags come from the client side for now, so keep only a few short, well-formed ones.
-function cleanPhotoTags(raw: unknown): RoomMessage["photoTags"] {
-  if (!Array.isArray(raw)) return null
-  const tags = raw.slice(0, 12).flatMap((t) => {
-    const { field, tag, confidence } = (t ?? {}) as Record<string, unknown>
-    if (typeof field !== "string" || typeof tag !== "string" || typeof confidence !== "number") return []
-    if (field.length > 20 || tag.length > 40 || !(confidence >= 0 && confidence <= 1)) return []
-    return [{ field, tag, confidence }]
-  })
-  return tags.length ? tags : null
+// Reads the file's first bytes rather than trusting the declared type.
+function sniffImage(b: Uint8Array): string | null {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg"
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png"
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "image/webp"
+  return null
 }
 
 // Constant-time comparison, so response timing can't reveal how much of a guess matched.
@@ -253,7 +299,7 @@ function toMessage(r: Record<string, any>): RoomMessage {
     id: r.id, clientId: r.client_id, createdAt: r.created_at, receivedAt: r.received_at, text: r.text,
     photoTags: JSON.parse(r.photo), status: r.status, brief: JSON.parse(r.brief), corrected: JSON.parse(r.corrected),
     changed: JSON.parse(r.changed ?? "[]"), reply: r.reply, requestId: r.request_id, ms: r.ms,
-    correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"),
+    correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [],
   }
 }
 

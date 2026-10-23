@@ -14,6 +14,8 @@ export type RoomMessage = {
   receivedAt: string
   text: string
   photoTags: { field: string; tag: string; confidence: number }[] | null
+  // Ids of photos the client attached, served by /api/room/<stylist>/image/<id>.
+  images: string[]
   status: "drafting" | "drafted" | "failed" | "replied"
   brief: Record<string, any> | null
   corrected: Record<string, any> | null
