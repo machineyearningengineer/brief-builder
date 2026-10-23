@@ -18,3 +18,6 @@ todos.json
 
 # local Mubit run results
 runs/
+
+# cf build output
+.cloudflare/

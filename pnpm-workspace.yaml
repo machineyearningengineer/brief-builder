@@ -1,8 +1,6 @@
 allowBuilds:
   esbuild: true
   lightningcss: true
-  msgpackr-extract: set this to true or false
+  msgpackr-extract: false
   sharp: true
   workerd: true
-minimumReleaseAgeExclude:
-  - cf@1.0.0-beta.21
