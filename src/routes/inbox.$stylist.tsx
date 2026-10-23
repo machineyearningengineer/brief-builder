@@ -56,7 +56,20 @@ const ASK: Record<string, string> = {
 }
 
 const get = (o: any, path: string) => path.split('.').reduce((v, k) => v?.[k], o)
-const words = (v: unknown) => (v === null || v === undefined || v === 'unknown' ? '' : String(v).replaceAll('_', ' '))
+// Values read the way a stylist says them, in sentence case.
+const SPOKEN: Record<string, string> = {
+  butt: "bum length", mid_back: "mid-back", bra_strap: "bra strap", shoulder: "shoulder length", waist: "waist length",
+  boho_throughout: "boho, curls throughout", curly_ends: "curly ends", two_tone: "two-tone", "1b": "1B", offer_slots: "offer slots",
+  box_braids: "box braids", french_curls: "French curls", locs_retwist: "loc retwist", loc_install: "starter locs", silk_press: "silk press",
+  sew_in: "sew-in", wig_install: "wig install", lived_in_blonde: "lived-in blonde", virgin_dark: "never dyed, dark", virgin_light: "never dyed, light",
+  box_dye: "box dye", previously_lightened: "lightened before", root_touch_up: "root touch-up", full_colour: "full colour", colour_correction: "colour correction",
+  heart_design: "heart design", triangle_parts: "triangle parts", fulani_pattern: "Fulani pattern", side_part: "side part", edges_laid: "edges laid",
+}
+const words = (v: unknown) => {
+  if (v === null || v === undefined || v === "unknown") return ""
+  const s = SPOKEN[String(v)] ?? String(v).replaceAll("_", " ")
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
 const shortId = (id: string) => id.slice(0, 4).toUpperCase()
 const time = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
@@ -116,7 +129,10 @@ function InboxPage() {
             <h1>Messages</h1>
             <small className={connected ? 'live on' : 'live'}>{connected ? `${STYLISTS[stylist].name} · live` : 'Reconnecting…'}</small>
           </div>
-          <button className="icon-btn" onClick={toggleTheme} aria-label="Switch day or night"><SunMoonIcon /></button>
+          <span className="tools">
+            <ResetButton stylist={stylist} token={token} onDone={() => setSelected(null)} />
+            <button className="icon-btn" onClick={toggleTheme} aria-label="Switch day or night"><SunMoonIcon /></button>
+          </span>
         </header>
         {list.length === 0 && <p className="muted empty">New DMs show up here the moment they’re sent.</p>}
         {list.map((m) => (
@@ -134,6 +150,24 @@ function InboxPage() {
       <style>{CSS}</style>
     </div>
   )
+}
+
+// Clears every DM, photo and live correction in this stylist's room, for a fresh demo run.
+// The first tap arms it; a second tap within three seconds clears.
+function ResetButton({ stylist, token, onDone }: { stylist: StylistKey; token: string; onDone: () => void }) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const t = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(t)
+  }, [armed])
+  const click = async () => {
+    if (!armed) return setArmed(true)
+    setArmed(false)
+    await post(stylist, 'reset', {}, token).catch(() => {})
+    onDone()
+  }
+  return <button className={armed ? 'btn reset armed' : 'btn reset'} onClick={click}>{armed ? 'Tap again to clear' : 'Clear'}</button>
 }
 
 function Photos({ ids, stylist, token }: { ids: string[]; stylist: StylistKey; token: string }) {
@@ -336,6 +370,9 @@ const CSS = `
 .list header { display: flex; justify-content: space-between; align-items: center; padding: 0 8px 12px; }
 .list h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .live { color: var(--faint); font-size: 13px; }
+.tools { display: flex; gap: 4px; align-items: center; }
+.reset { padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.reset.armed { color: var(--bad); border-color: var(--bad); }
 .live.on { color: var(--good); }
 .empty { padding: 8px; }
 .row { display: flex; gap: 10px; text-align: left; border: 0; background: none; border-radius: 14px; padding: 10px; align-items: flex-start; transition: background 120ms var(--ease); }
@@ -372,16 +409,16 @@ const CSS = `
 .error { color: var(--bad); }
 .sheet-pane { overflow-y: auto; padding: calc(env(safe-area-inset-top) + 18px) max(18px, env(safe-area-inset-right)) 24px 18px; display: flex; flex-direction: column; gap: 18px; background: var(--surface); }
 .sheet-head { display: grid; gap: 4px; padding-bottom: 4px; }
-.service select { font: 700 26px/1.15 var(--sans); letter-spacing: -0.02em; border: 0; background: transparent; padding: 0; text-transform: capitalize; max-width: 100%; appearance: none; cursor: pointer; }
+.service select { font: 700 26px/1.15 var(--sans); letter-spacing: -0.02em; border: 0; background: transparent; padding: 0; max-width: 100%; appearance: none; cursor: pointer; }
 .price { font-size: 17px; }
 .price b { font-variant-numeric: tabular-nums; }
 .saved { color: var(--accent); font-weight: 600; font-size: 14px; }
 .block { display: grid; }
 .block .eyebrow { margin-bottom: 4px; }
 .line { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); min-height: 44px; }
-.line .k { color: var(--muted); font-size: 14px; text-transform: capitalize; }
-.line .v { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; text-transform: capitalize; }
-.line select { border: 1px solid transparent; background: transparent; border-radius: 10px; padding: 5px 6px; margin-left: -6px; font-weight: 600; text-transform: capitalize; max-width: 100%; }
+.line .k { color: var(--muted); font-size: 14px; }
+.line .v { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.line select { border: 1px solid transparent; background: transparent; border-radius: 10px; padding: 5px 6px; margin-left: -6px; font-weight: 600; max-width: 100%; }
 .line select:hover, .line select:focus { border-color: var(--line); background: var(--bg); }
 .line.fixed select { color: var(--good); }
 .line s { color: var(--bad); }

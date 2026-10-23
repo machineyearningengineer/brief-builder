@@ -13,7 +13,7 @@ import colouristCorrections from "../../data/colourist/corrections.jsonl?raw"
 import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
 import { closestCorrections, correctionsBlock, type Correction } from "./corrections.ts"
-import { guardEvidence } from "./guards.ts"
+import { applyTrustedPhotoTags, guardEvidence } from "./guards.ts"
 import { readPhotos } from "./photo-reader.ts"
 
 const PROFILES = {
@@ -213,6 +213,11 @@ export class StylistRoom extends DurableObject<Env> {
     }).catch((e) => ({ status: 0, ms: 0, requestId: null, brief: null, error: String(e), tokensIn: null, tokensOut: null }))
     const brief = result.brief as Record<string, any> | null
     const trusted = new Set((m.photoTags ?? []).filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
+    if (brief && m.photoTags) {
+      applyTrustedPhotoTags(brief, m.photoTags, (tags as any).trust_threshold)
+      // A field the photo now answers is no longer something to ask about.
+      if (Array.isArray(brief.missing)) brief.missing = brief.missing.filter((k: string) => brief.look?.[k] === undefined || brief.look[k] === "unknown")
+    }
     const guarded = brief ? guardEvidence(brief, m.text, trusted) : []
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.

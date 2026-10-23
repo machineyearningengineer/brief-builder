@@ -11,6 +11,38 @@ const setPath = (o: any, path: string, value: unknown) => {
   if (parent && last in parent) parent[last] = value
 }
 
+// House rule 11, applied in code: a trusted photo tag fills any field the DM left unknown,
+// citing "[photo]". A field the DM did state is never overwritten by the photo.
+export function applyTrustedPhotoTags(brief: Record<string, any>, tags: { field: string; tag: string; confidence: number }[], threshold: number): string[] {
+  const filled: string[] = []
+  brief.evidence ??= {}
+  for (const t of tags) {
+    if (t.confidence < threshold) continue
+    if (t.field === "service") {
+      if (brief.service === "unknown") {
+        brief.service = t.tag
+        brief.evidence.service = "[photo]"
+        filled.push("service")
+      }
+      continue
+    }
+    const look = brief.look
+    if (!look || !(t.field in look)) continue
+    if (Array.isArray(look[t.field])) {
+      if (!look[t.field].includes(t.tag)) {
+        look[t.field].push(t.tag)
+        brief.evidence[`look.${t.field}`] = "[photo]"
+        filled.push(`look.${t.field}`)
+      }
+    } else if (look[t.field] === "unknown") {
+      look[t.field] = t.tag
+      brief.evidence[`look.${t.field}`] = "[photo]"
+      filled.push(`look.${t.field}`)
+    }
+  }
+  return filled
+}
+
 export function guardEvidence(brief: Record<string, any>, text: string, trustedPhotoFields: Set<string>): string[] {
   const cleared: string[] = []
   const evidence: Record<string, string> = brief.evidence ?? {}

@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import scoreboard from '../shared/scoreboard.json'
 import { stylistToken, useRoom } from '../client/room.ts'
+import { Qr } from '../client/qr.tsx'
 import { STYLISTS, type StylistKey } from '../shared/stylists.ts'
 
 export const Route = createFileRoute('/stage')({
@@ -27,8 +28,10 @@ const RULE_SHORT: Record<StylistKey, Record<string, string>> = {
 function Stage() {
   const [stylist, setStylist] = useState<StylistKey>('braider')
   const [token, setToken] = useState('')
+  const [origin, setOrigin] = useState('')
   useEffect(() => {
     setToken(stylistToken.get())
+    setOrigin(location.origin)
   }, [])
   const { messages, connected } = useRoom(stylist, token ? { token } : null)
   const latest = messages.at(-1)
@@ -80,6 +83,14 @@ function Stage() {
       </section>
 
       <section className="live">
+        <div className="scan">
+          <Qr value={origin ? `${origin}/s/${stylist}` : ''} size={168} label={`QR code to message ${STYLISTS[stylist].name}`} />
+          <div>
+            <p className="eyebrow">Scan to message</p>
+            <p className="scan-name">{STYLISTS[stylist].name}</p>
+            <p className="muted mono">{origin.replace(/^https?:\/\//, '')}/s/{stylist}</p>
+          </div>
+        </div>
         <h2>Live <span className={connected ? 'dot on' : 'dot'} aria-label={connected ? 'connected' : 'connecting'} /></h2>
         {!token && <p className="muted">Open the inbox once on this laptop to connect the live view.</p>}
         {latest ? (
@@ -135,6 +146,9 @@ const STAGE_CSS = `
 .bar b { position: absolute; left: calc(100% + 6px); top: -2px; font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .bar.b b { color: var(--accent); }
 .live { border-left: 1px solid var(--line); padding-left: 32px; display: flex; flex-direction: column; gap: 10px; }
+.scan { display: flex; gap: 18px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin-bottom: 8px; }
+.scan svg { border-radius: 10px; flex: none; }
+.scan-name { font: 700 22px/1.2 var(--sans); margin: 4px 0; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: inline-block; }
 .dot.on { background: var(--good); }
 .latest { border: 1.5px dashed var(--accent); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 6px; }
