@@ -32,6 +32,8 @@ const DM_WINDOW_MS = 10 * 60_000
 const MAX_IMAGES_PER_DM = 4
 const IMAGES_PER_WINDOW = 16
 const MAX_IMAGE_BYTES = 1_500_000
+const ROOM_IMAGE_BYTES_PER_WINDOW = 60_000_000
+const ORPHAN_IMAGE_MS = 30 * 60_000
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // What a client's phone may see of a message: their words, its status and the stylist's reply.
@@ -249,10 +251,16 @@ export class StylistRoom extends DurableObject<Env> {
     if (!CLIENT_ID.test(client)) return Response.json({ error: "Unknown client." }, { status: 400 })
     const recent = Number(this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM images WHERE client_id = ? AND created_at > ?`, client, Date.now() - DM_WINDOW_MS).toArray()[0]?.n ?? 0)
     if (recent >= IMAGES_PER_WINDOW) return Response.json({ error: "That's a lot of photos. Try again in a few minutes." }, { status: 429 })
-    const declared = Number(request.headers.get("content-length") ?? 0)
-    if (declared > MAX_IMAGE_BYTES) return Response.json({ error: "That photo is too large." }, { status: 413 })
-    const bytes = await request.arrayBuffer()
-    if (bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) return Response.json({ error: "That photo is too large." }, { status: 413 })
+    // Photos never attached to a message are removed after 30 minutes.
+    this.ctx.storage.sql.exec(
+      `DELETE FROM images WHERE created_at < ? AND id NOT IN (SELECT j.value FROM messages, json_each(messages.images) AS j)`,
+      Date.now() - ORPHAN_IMAGE_MS,
+    )
+    const roomBytes = Number(this.ctx.storage.sql.exec(`SELECT COALESCE(SUM(length(bytes)), 0) AS n FROM images WHERE created_at > ?`, Date.now() - DM_WINDOW_MS).toArray()[0]?.n ?? 0)
+    if (roomBytes >= ROOM_IMAGE_BYTES_PER_WINDOW) return Response.json({ error: "The stylist can't take more photos right now. Try again in a few minutes." }, { status: 429 })
+    if (Number(request.headers.get("content-length") ?? 0) > MAX_IMAGE_BYTES) return Response.json({ error: "That photo is too large." }, { status: 413 })
+    const bytes = await readCapped(request, MAX_IMAGE_BYTES)
+    if (!bytes || bytes.byteLength === 0) return Response.json({ error: "That photo is too large." }, { status: 413 })
     const mime = sniffImage(new Uint8Array(bytes.slice(0, 12)))
     if (!mime) return Response.json({ error: "Only photos can be attached." }, { status: 415 })
     const id = crypto.randomUUID()
@@ -276,6 +284,32 @@ export class StylistRoom extends DurableObject<Env> {
     this.broadcast({ type: "reset" })
     return Response.json({ ok: true })
   }
+}
+
+// Reads a request body as it arrives and gives up once it passes `limit`, so an oversized or
+// unlabelled upload is never fully buffered. Returns null when the body is too large.
+async function readCapped(request: Request, limit: number): Promise<ArrayBuffer | null> {
+  if (!request.body) return new ArrayBuffer(0)
+  const reader = request.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > limit) {
+      await reader.cancel()
+      return null
+    }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const c of chunks) {
+    out.set(c, at)
+    at += c.byteLength
+  }
+  return out.buffer
 }
 
 // Reads the file's first bytes rather than trusting the declared type.

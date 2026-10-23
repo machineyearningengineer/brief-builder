@@ -82,6 +82,19 @@ export async function post<T>(stylist: StylistKey, action: string, body: unknown
   return data
 }
 
+export async function uploadImage(stylist: StylistKey, client: string, blob: Blob): Promise<string> {
+  const res = await fetch(`/api/room/${stylist}/image?client=${encodeURIComponent(client)}`, { method: 'POST', body: blob, headers: { 'content-type': blob.type } })
+  const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string }
+  if (!res.ok || !data.id) throw new Error(data.error ?? 'That photo didn’t upload.')
+  return data.id
+}
+
+// The stylist's screens fetch photos with the key in a header, so they can't be plain <img> URLs.
+export async function imageUrlForStylist(stylist: StylistKey, id: string, token: string): Promise<string | null> {
+  const res = await fetch(`/api/room/${stylist}/image/${id}`, { headers: { 'x-stylist-token': token } })
+  return res.ok ? URL.createObjectURL(await res.blob()) : null
+}
+
 // A stable, unguessable id for this phone, so a client sees only their own thread.
 export function clientId(): string {
   try {
