@@ -46,7 +46,9 @@ How to fill it:
 - reply_draft is the stylist's reply: warm, short, British English, prices from the price list only, at most two questions, and never a confirmed booking.`
 }
 
-export function userMessage(dm: { received_at: string; text: string; photo: { reader_output: ReaderTag[] } | null }): string {
+// `corrections` is the stylist's closest past corrections (see corrections.ts); it lives here,
+// not in the instructions, so adding corrections never splits the Mubit task.
+export function userMessage(dm: { received_at: string; text: string; photo: { reader_output: ReaderTag[] } | null }, corrections = ""): string {
   const tags = dm.photo?.reader_output.map((t) => `${t.field}=${t.tag} (${t.confidence})`).join(", ") ?? "none"
-  return `Received: ${dm.received_at}\nPhoto tags: ${tags}\nDM:\n${dm.text}`
+  return `Received: ${dm.received_at}\nPhoto tags: ${tags}\nDM:\n${dm.text}${corrections}`
 }

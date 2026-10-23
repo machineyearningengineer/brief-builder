@@ -24,6 +24,7 @@ export async function callBrief(opts: {
   // "off" keeps the call out of Mubit's record entirely, so it can never become a training
   // example. Every call that scores the locked test or trend sets must use it.
   record?: "full" | "off"
+  corrections?: string
 }): Promise<BriefCallResult> {
   const started = Date.now()
   const res = await fetch(`${MUBIT_OPENAI_BASE}/chat/completions`, {
@@ -39,7 +40,7 @@ export async function callBrief(opts: {
       ...(opts.effort ? { reasoning_effort: opts.effort } : {}),
       messages: [
         { role: "system", content: instructionsFor(opts.profile, opts.tags) },
-        { role: "user", content: userMessage(opts.dm) },
+        { role: "user", content: userMessage(opts.dm, opts.corrections) },
       ],
     }),
   })

@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { Schema } from "effect"
 import { briefSchemaFor } from "../src/shared/brief.ts"
 import { callBrief } from "../src/server/brief-call.ts"
+import { closestCorrections, correctionsBlock, type Correction } from "../src/server/corrections.ts"
 
 const ROOT = join(import.meta.dirname, "..")
 const args = process.argv.slice(2)
@@ -30,6 +31,11 @@ const tags = read("tags.json")
 let dms = readFileSync(join(ROOT, "data", stylist, file), "utf8").trim().split("\n").map((l) => JSON.parse(l))
 if (args.includes("--only-seeds")) dms = dms.filter((d) => /^(s|c)\d+$/.test(d.id))
 dms = dms.slice(skip, skip + limit)
+// --with-corrections adds the stylist's closest past corrections to each DM, never its own.
+const withCorrections = args.includes("--with-corrections")
+const pool: Correction[] = withCorrections
+  ? readFileSync(join(ROOT, "data", stylist, "corrections.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
+  : []
 
 const flat = (o: any, p = ""): Record<string, string> =>
   Object.entries(o ?? {}).reduce((acc, [k, v]) => {
@@ -44,7 +50,8 @@ let next = 0
 async function worker() {
   while (next < dms.length) {
     const dm = dms[next++]
-    const r = await callBrief({ key: env.MUBIT_API_KEY, profile, tags, dm, effort, record })
+    const corrections = withCorrections ? correctionsBlock(closestCorrections(dm.text, pool.filter((c) => c.id !== dm.id))) : ""
+    const r = await callBrief({ key: env.MUBIT_API_KEY, profile, tags, dm, effort, record, corrections })
     const want = flat(dm.label)
     const got = flat(r.brief)
     const wrong = r.brief ? Object.keys(want).filter((k) => want[k] !== got[k]) : Object.keys(want)
@@ -61,6 +68,6 @@ const pct = (p: number) => ms[Math.min(ms.length - 1, Math.floor(p * ms.length))
 const fields = ok.reduce((a, r) => [a[0] + r.right, a[1] + r.of], [0, 0])
 console.log(`\n${ok.length}/${results.length} answered · ${ok.filter((r) => r.valid).length} schema-valid · fields ${fields[0]}/${fields[1]} (${((100 * fields[0]) / Math.max(1, fields[1])).toFixed(1)}%) · p50 ${pct(0.5)} ms · p95 ${pct(0.95)} ms · tokens in ${ok.reduce((a, r) => a + (r.tokens_in ?? 0), 0)} out ${ok.reduce((a, r) => a + (r.tokens_out ?? 0), 0)}`)
 mkdirSync(join(ROOT, "runs"), { recursive: true })
-const out = join(ROOT, "runs", `${new Date().toISOString().replace(/[:.]/g, "-")}-${stylist}-${file.replace(".jsonl", "")}-${effort}.jsonl`)
+const out = join(ROOT, "runs", `${new Date().toISOString().replace(/[:.]/g, "-")}-${stylist}-${file.replace(".jsonl", "")}-${effort}${withCorrections ? "-corrected" : ""}.jsonl`)
 writeFileSync(out, results.map((r) => JSON.stringify(r)).join("\n") + "\n")
 console.log(`saved ${out}`)
