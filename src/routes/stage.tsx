@@ -10,10 +10,18 @@ export const Route = createFileRoute('/stage')({
   component: Stage,
 })
 
-type Summary = NonNullable<typeof scoreboard.base>
-const RULE_SHORT: Record<string, string> = {
-  '1': 'Boho vs curly ends', '3': 'Hair not included', '4': 'Budget is a ceiling', '5': 'Offer slots, never book',
-  '6': 'Smedium', '7': 'Groups and kids', '9': 'Day words', '11': 'Photo vs text',
+type Summary = { label: string; fullyRight: number; nextAction: number; fields: number; nextActionByRule: Record<string, number> }
+type Board = { testSet: string; base: Summary | null; corrected: Summary | null }
+const BOARDS = scoreboard as Record<string, Board | undefined>
+const RULE_SHORT: Record<StylistKey, Record<string, string>> = {
+  braider: {
+    '1': 'Boho vs curly ends', '3': 'Hair not included', '4': 'Budget is a ceiling', '5': 'Offer slots, never book',
+    '6': 'Smedium', '7': 'Groups and kids', '9': 'Day words', '11': 'Photo vs text',
+  },
+  colourist: {
+    '12': 'Patch test first', '13': 'Toner included', '14': 'Lived-in blonde', '15': 'Box dye needs a consult',
+    '16': 'Dark to blonde', '5': 'Offer slots, never book', '9': 'Day words', '4': 'Budget is a ceiling',
+  },
 }
 
 function Stage() {
@@ -25,14 +33,15 @@ function Stage() {
   const { messages, connected } = useRoom(stylist, token ? { token } : null)
   const latest = messages.at(-1)
   const fixes = messages.filter((m) => m.corrected).length
-  const base = scoreboard.base as Summary
-  const fixed = scoreboard.corrected as Summary
+  const board = BOARDS[stylist]
+  const base = board?.base
+  const fixed = board?.corrected
 
   return (
     <main className="stage">
       <header>
         <div>
-          <p className="eyebrow">Brief Builder · {scoreboard.testSet}</p>
+          <p className="eyebrow">Brief Builder · {board?.testSet ?? 'locked test set'}</p>
           <h1>Every fix a stylist makes becomes their own model.</h1>
         </div>
         <div className="switch" role="group" aria-label="Stylist">
@@ -42,18 +51,22 @@ function Stage() {
         </div>
       </header>
 
-      <section className="scores">
-        <Score label="Briefs fully right" a={base.fullyRight} b={fixed.fullyRight} />
-        <Score label="Right next step" a={base.nextAction} b={fixed.nextAction} />
-        <Score label="Fields right" a={base.fields} b={fixed.fields} />
-      </section>
+      {base && fixed ? (
+        <section className="scores">
+          <Score label="Briefs fully right" a={base.fullyRight} b={fixed.fullyRight} />
+          <Score label="Right next step" a={base.nextAction} b={fixed.nextAction} />
+          <Score label="Fields right" a={base.fields} b={fixed.fields} />
+        </section>
+      ) : (
+        <section className="scores"><p className="muted">This stylist’s locked test hasn’t been scored yet.</p></section>
+      )}
 
       <section className="rules">
         <h2>Right next step, by house rule</h2>
-        <div className="legend"><span><i className="a" /> {base.label}</span><span><i className="b" /> {fixed.label}</span></div>
-        {Object.entries(RULE_SHORT).map(([id, name]) => {
-          const a = (base.nextActionByRule as Record<string, number>)[id] ?? 0
-          const b = (fixed.nextActionByRule as Record<string, number>)[id] ?? 0
+        {base && fixed && <div className="legend"><span><i className="a" /> {base.label}</span><span><i className="b" /> {fixed.label}</span></div>}
+        {base && fixed && Object.entries(RULE_SHORT[stylist]).filter(([id]) => id in base.nextActionByRule).map(([id, name]) => {
+          const a = base.nextActionByRule[id] ?? 0
+          const b = fixed.nextActionByRule[id] ?? 0
           return (
             <div key={id} className="rule">
               <span className="name">{name}</span>

@@ -1,64 +1,66 @@
 {
-  "stylist": "braider",
-  "testSet": "60 locked DMs, never recorded by Mubit",
-  "rules": {
-    "1": "\"Boho\" means curls throughout; \"curly ends\" is a different look.",
-    "2": "Short 4a-4c hair plus waist length or longer: ask for a photo of the current hair before quoting.",
-    "3": "Prices exclude hair unless the client says it's included; say so in the reply.",
-    "4": "\"Under £X\" is a ceiling, never a quote. Quote the real price and offer a cheaper option if it's over.",
-    "5": "Never confirm a booking from a DM: offer specific slots instead.",
-    "6": "\"Smedium\" is a real size, between small and medium. Don't set it unless the client chooses it.",
-    "7": "\"Me and my sister\" or \"me and my mum\" sets people; a child's hair is referred elsewhere.",
-    "8": "Wig installs are declined; offer what the stylist does instead.",
-    "9": "Day words resolve against the message's received time (\"sat\" sent on a Sunday means next Saturday).",
-    "10": "The reply asks at most two questions, most important first.",
-    "11": "Photo tags under 0.6 confidence aren't used. Text beats photo; a clash on length or ends becomes a question."
-  },
-  "base": {
-    "label": "gpt-6-luna",
-    "run": "2026-10-23T21-19-31-422Z-braider-heldout-low.jsonl",
-    "briefs": 60,
-    "fullyRight": 28,
-    "nextAction": 65,
-    "fields": 91,
-    "p50ms": 21096,
-    "tokensPerBrief": 1613,
-    "nextActionByRule": {
-      "1": 57,
-      "2": 100,
-      "3": 50,
-      "4": 60,
-      "5": 26,
-      "6": 50,
-      "7": 80,
-      "8": 100,
-      "9": 61,
-      "10": 100,
-      "11": 55
-    }
-  },
-  "corrected": {
-    "label": "gpt-6-luna + stylist fixes",
-    "run": "2026-10-23T21-28-11-718Z-braider-heldout-low-corrected.jsonl",
-    "briefs": 60,
-    "fullyRight": 52,
-    "nextAction": 83,
-    "fields": 95,
-    "p50ms": 19371,
-    "tokensPerBrief": 2041,
-    "nextActionByRule": {
-      "1": 83,
-      "2": 100,
-      "3": 78,
-      "4": 80,
-      "5": 67,
-      "6": 100,
-      "7": 100,
-      "8": 100,
-      "9": 78,
-      "10": 100,
-      "11": 77
-    }
-  },
-  "adapter": null
+  "braider": {
+    "stylist": "braider",
+    "testSet": "60 locked DMs, never recorded by Mubit",
+    "rules": {
+      "1": "\"Boho\" means curls throughout; \"curly ends\" is a different look.",
+      "2": "Short 4a-4c hair plus waist length or longer: ask for a photo of the current hair before quoting.",
+      "3": "Prices exclude hair unless the client says it's included; say so in the reply.",
+      "4": "\"Under £X\" is a ceiling, never a quote. Quote the real price and offer a cheaper option if it's over.",
+      "5": "Never confirm a booking from a DM: offer specific slots instead.",
+      "6": "\"Smedium\" is a real size, between small and medium. Don't set it unless the client chooses it.",
+      "7": "\"Me and my sister\" or \"me and my mum\" sets people; a child's hair is referred elsewhere.",
+      "8": "Wig installs are declined; offer what the stylist does instead.",
+      "9": "Day words resolve against the message's received time (\"sat\" sent on a Sunday means next Saturday).",
+      "10": "The reply asks at most two questions, most important first.",
+      "11": "Photo tags under 0.6 confidence aren't used. Text beats photo; a clash on length or ends becomes a question."
+    },
+    "base": {
+      "label": "gpt-6-luna",
+      "run": "2026-10-23T21-19-31-422Z-braider-heldout-low.jsonl",
+      "briefs": 60,
+      "fullyRight": 28,
+      "nextAction": 65,
+      "fields": 91,
+      "p50ms": 21096,
+      "tokensPerBrief": 1613,
+      "nextActionByRule": {
+        "1": 57,
+        "2": 100,
+        "3": 50,
+        "4": 60,
+        "5": 26,
+        "6": 50,
+        "7": 80,
+        "8": 100,
+        "9": 61,
+        "10": 100,
+        "11": 55
+      }
+    },
+    "corrected": {
+      "label": "gpt-6-luna + stylist fixes",
+      "run": "2026-10-23T21-28-11-718Z-braider-heldout-low-corrected.jsonl",
+      "briefs": 60,
+      "fullyRight": 52,
+      "nextAction": 83,
+      "fields": 95,
+      "p50ms": 19371,
+      "tokensPerBrief": 2041,
+      "nextActionByRule": {
+        "1": 83,
+        "2": 100,
+        "3": 78,
+        "4": 80,
+        "5": 67,
+        "6": 100,
+        "7": 100,
+        "8": 100,
+        "9": 78,
+        "10": 100,
+        "11": 77
+      }
+    },
+    "adapter": null
+  }
 }

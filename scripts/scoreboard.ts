@@ -1,7 +1,7 @@
-// Summarises the newest scored runs of the locked test set into src/shared/scoreboard.json,
-// which the stage view shows. Nothing on stage is typed in by hand.
-// Usage: node scripts/scoreboard.ts [stylist]
-import { readdirSync, readFileSync, writeFileSync } from "node:fs"
+// Summarises the newest scored runs of each stylist's locked test set into
+// src/shared/scoreboard.json, which the stage view shows. Nothing on stage is typed in by hand.
+// Usage: node scripts/scoreboard.ts [stylist]   (updates that stylist's entry)
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 const ROOT = join(import.meta.dirname, "..")
@@ -42,5 +42,10 @@ const out = {
   corrected: summarise(newest(true), "gpt-6-luna + stylist fixes"),
   adapter: null as null | ReturnType<typeof summarise>,
 }
-writeFileSync(join(ROOT, "src", "shared", "scoreboard.json"), JSON.stringify(out, null, 2) + "\n")
+const path = join(ROOT, "src", "shared", "scoreboard.json")
+const all = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {}
+// Older single-stylist files had no per-stylist keys.
+const merged = "base" in all ? { [all.stylist]: all } : all
+merged[stylist] = out
+writeFileSync(path, JSON.stringify(merged, null, 2) + "\n")
 console.log(`base ${out.base?.fullyRight}% fully right · with fixes ${out.corrected?.fullyRight}% (${out.base?.run} · ${out.corrected?.run})`)

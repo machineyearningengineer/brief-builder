@@ -24,7 +24,7 @@ const MAX_DM = 1000
 const MAX_CORRECTION_BYTES = 8_000
 const DM_PER_WINDOW = 8
 const DM_PER_ROOM_WINDOW = 60 // past this, DMs land undrafted
-const DM_ROOM_HARD_CAP = 300 // past this, refused, so storage can't be flooded
+const DM_ROOM_HARD_CAP = 300 // past this, the oldest undrafted overflow is dropped
 const DM_WINDOW_MS = 10 * 60_000
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
@@ -152,7 +152,14 @@ export class StylistRoom extends DurableObject<Env> {
       return Response.json({ error: "That's a lot of messages. Give the stylist a minute to reply." }, { status: 429 })
     }
     const roomRecent = Number(this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE created_at > ?`, since).toArray()[0]?.n ?? 0)
-    if (roomRecent >= DM_ROOM_HARD_CAP) return Response.json({ error: "The stylist's inbox is full right now. Try again in a few minutes." }, { status: 429 })
+    // Nobody is refused room-wide. Past the hard cap the oldest undrafted overflow (no brief,
+    // no reply) is dropped instead, which keeps storage bounded during a flood.
+    if (roomRecent >= DM_ROOM_HARD_CAP) {
+      this.ctx.storage.sql.exec(
+        `DELETE FROM messages WHERE id IN (SELECT id FROM messages WHERE brief = 'null' AND reply IS NULL AND status = 'failed' ORDER BY created_at LIMIT ?)`,
+        roomRecent - DM_ROOM_HARD_CAP + 1,
+      )
+    }
     const draft = roomRecent < DM_PER_ROOM_WINDOW
     const photoTags = cleanPhotoTags(body.photoTags)
     const m: RoomMessage = {
