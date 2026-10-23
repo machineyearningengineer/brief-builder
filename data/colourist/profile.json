@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "id": "colourist",
+  "persona": "Colourist renting a chair in Dalston, East London. Colour only: balayage, highlights, babylights, full colour, roots and toners, on every hair type. Doesn't colour under-16s.",
+  "currency": "GBP",
+  "prices": {
+    "note": "Length-priced services start at shoulder length. Toner is included with balayage and highlights. Colour correction is quoted only after a free 15-minute consultation.",
+    "base": {"balayage": 180, "highlights": 150, "babylights": 210, "full_colour": 85},
+    "length": {"shoulder": 0, "bra_strap": 20, "mid_back": 40, "waist": 60},
+    "fixed": {"root_touch_up": 65, "toner": 45}
+  },
+  "house_rules": [
+    {"id": 4, "rule": "\"Under £X\" is a ceiling, never a quote. Quote the real price."},
+    {"id": 5, "rule": "Never confirm a booking from a DM: offer specific slots instead."},
+    {"id": 7, "rule": "\"Me and my mum\" sets people; under-16s are referred elsewhere."},
+    {"id": 9, "rule": "Day words resolve against the message's received time."},
+    {"id": 10, "rule": "The reply asks at most two questions, most important first."},
+    {"id": 11, "rule": "Photo tags under 0.6 confidence aren't used. Text beats photo; a clash on length or shade becomes a question."},
+    {"id": 12, "rule": "New colour clients need a patch test at least 48 hours before; never offer a colour slot sooner."},
+    {"id": 13, "rule": "Toner is included with balayage and highlights; a toner on its own is a separate £45 service."},
+    {"id": 14, "rule": "\"Lived-in blonde\" means a soft-root balayage, not all-over blonde."},
+    {"id": 15, "rule": "Box-dyed or previously lightened hair needs a free consultation before any quote (roots and toners excepted)."},
+    {"id": 16, "rule": "Going from naturally dark to blonde can take two sessions; say so."}
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "note": "Weekend tag list for the photo reader (Jev, Clairic or Clef: any reader that picks from listed options with a confidence). One question per field; the reader answers each with one tag or null.",
+  "trust_threshold": 0.6,
+  "fields": {
+    "service": [
+      "knotless",
+      "box_braids",
+      "cornrows",
+      "french_curls",
+      "locs_retwist",
+      "loc_install",
+      "twists",
+      "silk_press",
+      "sew_in",
+      "wig_install",
+      "other"
+    ],
+    "length": [
+      "shoulder",
+      "bra_strap",
+      "mid_back",
+      "waist",
+      "butt"
+    ],
+    "size": [
+      "small",
+      "smedium",
+      "medium",
+      "large",
+      "jumbo"
+    ],
+    "ends": [
+      "straight",
+      "curly_ends",
+      "boho_throughout"
+    ],
+    "colour": [
+      "natural",
+      "1b",
+      "two_tone",
+      "ginger",
+      "blonde",
+      "other"
+    ],
+    "extras": [
+      "beads",
+      "cuffs",
+      "heart_design",
+      "fulani_pattern",
+      "side_part",
+      "triangle_parts",
+      "edges_laid"
+    ]
+  },
+  "reader_fields": [
+    "service",
+    "length",
+    "size",
+    "ends",
+    "colour",
+    "extras"
+  ]
+}

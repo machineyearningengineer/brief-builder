@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "note": "Colourist tag list. reader_fields are the questions the photo reader answers; history comes from the client's words only.",
+  "trust_threshold": 0.6,
+  "reader_fields": ["service", "length", "shade"],
+  "fields": {
+    "service": ["balayage", "highlights", "babylights", "full_colour", "root_touch_up", "toner", "colour_correction", "other"],
+    "length": ["shoulder", "bra_strap", "mid_back", "waist"],
+    "shade": ["lived_in_blonde", "ash_blonde", "honey_blonde", "caramel", "copper", "brunette", "black", "red"],
+    "history": ["virgin_dark", "virgin_light", "box_dye", "previously_lightened"]
+  }
+}

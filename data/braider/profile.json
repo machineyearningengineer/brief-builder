@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "id": "braider",
+  "persona": "Independent braider working from home in Peckham, South London. Hair only. Does not do children's hair or wig installs.",
+  "currency": "GBP",
+  "prices": {
+    "note": "Hair not included unless stated. Base price is medium size, mid-back length.",
+    "base": {
+      "knotless": 140,
+      "box_braids": 120,
+      "french_curls": 150,
+      "twists": 110
+    },
+    "length": {
+      "shoulder": -30,
+      "bra_strap": -15,
+      "mid_back": 0,
+      "waist": 30,
+      "butt": 60
+    },
+    "size": {
+      "jumbo": -40,
+      "large": -20,
+      "medium": 0,
+      "smedium": 20,
+      "small": 40
+    },
+    "ends": {
+      "straight": 0,
+      "curly_ends": 10,
+      "boho_throughout": 25
+    },
+    "fixed": {
+      "cornrows_straight_back": 45,
+      "cornrows_designs": 70,
+      "locs_retwist": 60,
+      "loc_install": 250,
+      "silk_press": 65,
+      "sew_in": 120
+    },
+    "hair_provided_by_stylist": 15
+  },
+  "house_rules": [
+    {
+      "id": 1,
+      "rule": "\"Boho\" means curls throughout; \"curly ends\" is a different look."
+    },
+    {
+      "id": 2,
+      "rule": "Short 4a-4c hair plus waist length or longer: ask for a photo of the current hair before quoting."
+    },
+    {
+      "id": 3,
+      "rule": "Prices exclude hair unless the client says it's included; say so in the reply."
+    },
+    {
+      "id": 4,
+      "rule": "\"Under £X\" is a ceiling, never a quote. Quote the real price and offer a cheaper option if it's over."
+    },
+    {
+      "id": 5,
+      "rule": "Never confirm a booking from a DM: offer specific slots instead."
+    },
+    {
+      "id": 6,
+      "rule": "\"Smedium\" is a real size, between small and medium. Don't set it unless the client chooses it."
+    },
+    {
+      "id": 7,
+      "rule": "\"Me and my sister\" or \"me and my mum\" sets people; a child's hair is referred elsewhere."
+    },
+    {
+      "id": 8,
+      "rule": "Wig installs are declined; offer what the stylist does instead."
+    },
+    {
+      "id": 9,
+      "rule": "Day words resolve against the message's received time (\"sat\" sent on a Sunday means next Saturday)."
+    },
+    {
+      "id": 10,
+      "rule": "The reply asks at most two questions, most important first."
+    },
+    {
+      "id": 11,
+      "rule": "Photo tags under 0.6 confidence aren't used. Text beats photo; a clash on length or ends becomes a question."
+    }
+  ]
+}
