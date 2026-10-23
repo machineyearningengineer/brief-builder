@@ -23,6 +23,7 @@ const parseJsonl = (s: string): Correction[] => s.trim() ? s.trim().split("\n").
 const MAX_DM = 1000
 const MAX_CORRECTION_BYTES = 8_000
 const DM_PER_WINDOW = 8
+const DM_PER_ROOM_WINDOW = 60
 const DM_WINDOW_MS = 10 * 60_000
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
@@ -53,8 +54,11 @@ export class StylistRoom extends DurableObject<Env> {
     const url = new URL(request.url)
     const [, , , stylist, action] = url.pathname.split("/") // /api/room/<stylist>/<action>
     this.remember(stylist as StylistKey)
-    const token = request.headers.get("x-stylist-token") ?? url.searchParams.get("token") ?? ""
-    const isStylist = !!this.env.STYLIST_TOKEN && token === this.env.STYLIST_TOKEN
+    // The key never travels in a URL: HTTP sends it as x-stylist-token, and a browser
+    // WebSocket (which can't set headers) offers it as a "key.<token>" subprotocol.
+    const protocols = (request.headers.get("sec-websocket-protocol") ?? "").split(",").map((p) => p.trim())
+    const offered = request.headers.get("x-stylist-token") ?? protocols.find((p) => p.startsWith("key."))?.slice(4) ?? ""
+    const isStylist = sameSecret(offered, this.env.STYLIST_TOKEN)
     const client = url.searchParams.get("client") ?? ""
 
     if (action === "ws") {
@@ -62,7 +66,8 @@ export class StylistRoom extends DurableObject<Env> {
       if (!isStylist && !CLIENT_ID.test(client)) return new Response("Unknown client", { status: 401 })
       const pair = new WebSocketPair()
       this.ctx.acceptWebSocket(pair[1], [isStylist ? "stylist" : `client:${client}`])
-      return new Response(null, { status: 101, webSocket: pair[0] })
+      const headers = protocols.includes("brief-builder") ? { "sec-websocket-protocol": "brief-builder" } : undefined
+      return new Response(null, { status: 101, webSocket: pair[0], headers })
     }
     if (action === "state" && request.method === "GET") {
       if (isStylist) return Response.json({ messages: this.messages() })
@@ -137,8 +142,14 @@ export class StylistRoom extends DurableObject<Env> {
     if (!text) return Response.json({ error: "A message needs text." }, { status: 400 })
     if (!CLIENT_ID.test(String(body.clientId ?? ""))) return Response.json({ error: "Unknown client." }, { status: 400 })
     // Each DM costs a Mubit call, so one phone can send a few per window, not a flood.
-    const recent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE client_id = ? AND created_at > ?`, body.clientId, Date.now() - DM_WINDOW_MS).toArray()[0]
-    if (Number(recent?.n ?? 0) >= DM_PER_WINDOW) return Response.json({ error: "That's a lot of messages. Give the stylist a minute to reply." }, { status: 429 })
+    // Client ids are self-chosen, so a room-wide cap backs up the per-phone one. There's no
+    // per-IP limit: every judge on the venue Wi-Fi shares one address.
+    const since = Date.now() - DM_WINDOW_MS
+    const recent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE client_id = ? AND created_at > ?`, body.clientId, since).toArray()[0]
+    const roomRecent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE created_at > ?`, since).toArray()[0]
+    if (Number(recent?.n ?? 0) >= DM_PER_WINDOW || Number(roomRecent?.n ?? 0) >= DM_PER_ROOM_WINDOW) {
+      return Response.json({ error: "That's a lot of messages. Give the stylist a minute to reply." }, { status: 429 })
+    }
     const m: RoomMessage = {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
       receivedAt: londonTimestamp(new Date()), text, photoTags: body.photoTags ?? null, status: "drafting",
@@ -169,8 +180,10 @@ export class StylistRoom extends DurableObject<Env> {
     // Corrections go into future prompts and Mubit's training data, so only a brief that fits
     // this stylist's schema, at a sane size, is kept.
     if (JSON.stringify(body.corrected).length > MAX_CORRECTION_BYTES) return Response.json({ error: "That correction is too large." }, { status: 400 })
-    const decoded = Schema.decodeUnknownExit(briefSchemaFor[this.stylist!])(body.corrected, { onExcessProperty: "error" })
+    // Unknown keys are dropped and only the decoded brief is stored.
+    const decoded = Schema.decodeUnknownExit(briefSchemaFor[this.stylist!])(body.corrected)
     if (decoded._tag !== "Success") return Response.json({ error: "That correction doesn't fit the brief." }, { status: 400 })
+    body.corrected = decoded.value as Record<string, any>
     const changed = diffPaths(m.brief, body.corrected)
     const correction: Correction = {
       id: m.id, received_at: m.receivedAt, text: m.text,
@@ -196,6 +209,14 @@ export class StylistRoom extends DurableObject<Env> {
     this.broadcast({ type: "reset" })
     return Response.json({ ok: true })
   }
+}
+
+// Constant-time comparison, so response timing can't reveal how much of a guess matched.
+function sameSecret(offered: string, secret: string | undefined): boolean {
+  if (!secret || offered.length !== secret.length) return false
+  let diff = 0
+  for (let i = 0; i < secret.length; i++) diff |= offered.charCodeAt(i) ^ secret.charCodeAt(i)
+  return diff === 0
 }
 
 function toMessage(r: Record<string, any>): RoomMessage {

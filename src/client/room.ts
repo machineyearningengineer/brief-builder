@@ -6,17 +6,19 @@ import type { RoomEvent, RoomMessage, StylistKey } from '../shared/stylists.ts'
 
 export type RoomAuth = { client: string } | { token: string }
 
-const query = (auth: RoomAuth) =>
-  'client' in auth ? `client=${encodeURIComponent(auth.client)}` : `token=${encodeURIComponent(auth.token)}`
+// A client id may go in the URL (it's only an address); the stylist key never does.
+const query = (auth: RoomAuth) => ('client' in auth ? `client=${encodeURIComponent(auth.client)}` : '')
+const headers = (auth: RoomAuth): Record<string, string> => ('token' in auth ? { 'x-stylist-token': auth.token } : {})
+const protocols = (auth: RoomAuth) => ('token' in auth ? ['brief-builder', `key.${auth.token}`] : ['brief-builder'])
 
 export function useRoom(stylist: StylistKey, auth: RoomAuth | null) {
   const [messages, setMessages] = useState<RoomMessage[]>([])
   const [connected, setConnected] = useState(false)
   const [denied, setDenied] = useState(false)
-  const key = auth ? query(auth) : ''
+  const key = auth ? JSON.stringify(auth) : ''
 
   useEffect(() => {
-    if (!key) return
+    if (!auth) return
     let socket: WebSocket | null = null
     let stopped = false
     let retry: ReturnType<typeof setTimeout> | undefined
@@ -31,7 +33,7 @@ export function useRoom(stylist: StylistKey, auth: RoomAuth | null) {
       })
 
     const connect = () => {
-      fetch(`/api/room/${stylist}/state?${key}`)
+      fetch(`/api/room/${stylist}/state?${query(auth)}`, { headers: headers(auth) })
         .then((r) => {
           if (r.status === 401) {
             stopped = true
@@ -44,7 +46,7 @@ export function useRoom(stylist: StylistKey, auth: RoomAuth | null) {
         .catch(() => {})
       if (stopped) return
       const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-      socket = new WebSocket(`${proto}://${location.host}/api/room/${stylist}/ws?${key}`)
+      socket = new WebSocket(`${proto}://${location.host}/api/room/${stylist}/ws?${query(auth)}`, protocols(auth))
       socket.onopen = () => setConnected(true)
       socket.onmessage = (e) => {
         const event = JSON.parse(e.data) as RoomEvent

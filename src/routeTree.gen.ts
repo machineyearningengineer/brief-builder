@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InboxStylistRouteImport } from './routes/inbox.$stylist'
 import { Route as SStylistRouteImport } from './routes/s.$stylist'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxStylistRoute = InboxStylistRouteImport.update({
+  id: '/inbox/$stylist',
+  path: '/inbox/$stylist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SStylistRoute = SStylistRouteImport.update({
@@ -25,27 +31,31 @@ const SStylistRoute = SStylistRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/inbox/$stylist': typeof InboxStylistRoute
   '/s/$stylist': typeof SStylistRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/inbox/$stylist': typeof InboxStylistRoute
   '/s/$stylist': typeof SStylistRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/inbox/$stylist': typeof InboxStylistRoute
   '/s/$stylist': typeof SStylistRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/s/$stylist'
+  fullPaths: '/' | '/inbox/$stylist' | '/s/$stylist'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/s/$stylist'
-  id: '__root__' | '/' | '/s/$stylist'
+  to: '/' | '/inbox/$stylist' | '/s/$stylist'
+  id: '__root__' | '/' | '/inbox/$stylist' | '/s/$stylist'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  InboxStylistRoute: typeof InboxStylistRoute
   SStylistRoute: typeof SStylistRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox/$stylist': {
+      id: '/inbox/$stylist'
+      path: '/inbox/$stylist'
+      fullPath: '/inbox/$stylist'
+      preLoaderRoute: typeof InboxStylistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/s/$stylist': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  InboxStylistRoute: InboxStylistRoute,
   SStylistRoute: SStylistRoute,
 }
 export const routeTree = rootRouteImport
