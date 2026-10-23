@@ -23,7 +23,8 @@ const parseJsonl = (s: string): Correction[] => s.trim() ? s.trim().split("\n").
 const MAX_DM = 1000
 const MAX_CORRECTION_BYTES = 8_000
 const DM_PER_WINDOW = 8
-const DM_PER_ROOM_WINDOW = 60
+const DM_PER_ROOM_WINDOW = 60 // past this, DMs land undrafted
+const DM_ROOM_HARD_CAP = 300 // past this, refused, so storage can't be flooded
 const DM_WINDOW_MS = 10 * 60_000
 const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
@@ -150,11 +151,13 @@ export class StylistRoom extends DurableObject<Env> {
     if (Number(recent?.n ?? 0) >= DM_PER_WINDOW) {
       return Response.json({ error: "That's a lot of messages. Give the stylist a minute to reply." }, { status: 429 })
     }
-    const roomRecent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE created_at > ?`, since).toArray()[0]
-    const draft = Number(roomRecent?.n ?? 0) < DM_PER_ROOM_WINDOW
+    const roomRecent = Number(this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE created_at > ?`, since).toArray()[0]?.n ?? 0)
+    if (roomRecent >= DM_ROOM_HARD_CAP) return Response.json({ error: "The stylist's inbox is full right now. Try again in a few minutes." }, { status: 429 })
+    const draft = roomRecent < DM_PER_ROOM_WINDOW
+    const photoTags = cleanPhotoTags(body.photoTags)
     const m: RoomMessage = {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
-      receivedAt: londonTimestamp(new Date()), text, photoTags: body.photoTags ?? null, status: draft ? "drafting" : "failed",
+      receivedAt: londonTimestamp(new Date()), text, photoTags, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [],
     }
     this.save(m)
@@ -211,6 +214,18 @@ export class StylistRoom extends DurableObject<Env> {
     this.broadcast({ type: "reset" })
     return Response.json({ ok: true })
   }
+}
+
+// Photo tags come from the client side for now, so keep only a few short, well-formed ones.
+function cleanPhotoTags(raw: unknown): RoomMessage["photoTags"] {
+  if (!Array.isArray(raw)) return null
+  const tags = raw.slice(0, 12).flatMap((t) => {
+    const { field, tag, confidence } = (t ?? {}) as Record<string, unknown>
+    if (typeof field !== "string" || typeof tag !== "string" || typeof confidence !== "number") return []
+    if (field.length > 20 || tag.length > 40 || !(confidence >= 0 && confidence <= 1)) return []
+    return [{ field, tag, confidence }]
+  })
+  return tags.length ? tags : null
 }
 
 // Constant-time comparison, so response timing can't reveal how much of a guess matched.

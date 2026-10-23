@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StageRouteImport } from './routes/stage'
 import { Route as InboxStylistRouteImport } from './routes/inbox.$stylist'
 import { Route as SStylistRouteImport } from './routes/s.$stylist'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StageRoute = StageRouteImport.update({
+  id: '/stage',
+  path: '/stage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InboxStylistRoute = InboxStylistRouteImport.update({
@@ -31,30 +37,34 @@ const SStylistRoute = SStylistRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/stage': typeof StageRoute
   '/inbox/$stylist': typeof InboxStylistRoute
   '/s/$stylist': typeof SStylistRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/stage': typeof StageRoute
   '/inbox/$stylist': typeof InboxStylistRoute
   '/s/$stylist': typeof SStylistRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/stage': typeof StageRoute
   '/inbox/$stylist': typeof InboxStylistRoute
   '/s/$stylist': typeof SStylistRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/inbox/$stylist' | '/s/$stylist'
+  fullPaths: '/' | '/stage' | '/inbox/$stylist' | '/s/$stylist'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/inbox/$stylist' | '/s/$stylist'
-  id: '__root__' | '/' | '/inbox/$stylist' | '/s/$stylist'
+  to: '/' | '/stage' | '/inbox/$stylist' | '/s/$stylist'
+  id: '__root__' | '/' | '/stage' | '/inbox/$stylist' | '/s/$stylist'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  StageRoute: typeof StageRoute
   InboxStylistRoute: typeof InboxStylistRoute
   SStylistRoute: typeof SStylistRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stage': {
+      id: '/stage'
+      path: '/stage'
+      fullPath: '/stage'
+      preLoaderRoute: typeof StageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inbox/$stylist': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  StageRoute: StageRoute,
   InboxStylistRoute: InboxStylistRoute,
   SStylistRoute: SStylistRoute,
 }
