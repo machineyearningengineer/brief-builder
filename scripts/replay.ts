@@ -20,6 +20,8 @@ const effort = flag("effort", "low") as "none" | "low"
 const concurrency = Number(flag("concurrency", "4"))
 const limit = Number(flag("limit", "100000"))
 const skip = Number(flag("skip", "0"))
+// Only training data may be recorded; scoring the locked sets must never train Mubit.
+const record = file === "train.jsonl" ? "full" : "off"
 
 const env = Object.fromEntries(readFileSync(join(ROOT, ".dev.vars"), "utf8").trim().split("\n").map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]))
 const read = (f: string) => JSON.parse(readFileSync(join(ROOT, "data", stylist, f), "utf8"))
@@ -42,7 +44,7 @@ let next = 0
 async function worker() {
   while (next < dms.length) {
     const dm = dms[next++]
-    const r = await callBrief({ key: env.MUBIT_API_KEY, profile, tags, dm, effort })
+    const r = await callBrief({ key: env.MUBIT_API_KEY, profile, tags, dm, effort, record })
     const want = flat(dm.label)
     const got = flat(r.brief)
     const wrong = r.brief ? Object.keys(want).filter((k) => want[k] !== got[k]) : Object.keys(want)

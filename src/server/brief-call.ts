@@ -21,12 +21,18 @@ export async function callBrief(opts: {
   tags: Parameters<typeof instructionsFor>[1]
   dm: { received_at: string; text: string; photo: { reader_output: ReaderTag[] } | null }
   effort?: "none" | "low" | "medium" | "high"
-  sessionId?: string
+  // "off" keeps the call out of Mubit's record entirely, so it can never become a training
+  // example. Every call that scores the locked test or trend sets must use it.
+  record?: "full" | "off"
 }): Promise<BriefCallResult> {
   const started = Date.now()
   const res = await fetch(`${MUBIT_OPENAI_BASE}/chat/completions`, {
     method: "POST",
-    headers: { authorization: `Bearer ${opts.key}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${opts.key}`,
+      "content-type": "application/json",
+      ...(opts.record === "off" ? { "x-middleware-record": "off" } : {}),
+    },
     body: JSON.stringify({
       model: BRIEF_MODEL,
       response_format: { type: "json_object" },
