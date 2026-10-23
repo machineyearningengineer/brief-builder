@@ -1,7 +1,7 @@
 // Sends labelled DMs through Mubit so its task collects kept examples, a few at a time,
 // and scores each brief against our label. Results go to runs/<time>-<stylist>.jsonl.
 //
-// Usage: node scripts/replay.ts <stylist> <file> [--only-seeds] [--limit N] [--effort low] [--concurrency 4]
+// Usage: node scripts/replay.ts <stylist> <file> [--only-seeds] [--skip N] [--limit N] [--effort low] [--concurrency 4]
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { Schema } from "effect"
@@ -19,6 +19,7 @@ const file = args[1] ?? "train.jsonl"
 const effort = flag("effort", "low") as "none" | "low"
 const concurrency = Number(flag("concurrency", "4"))
 const limit = Number(flag("limit", "100000"))
+const skip = Number(flag("skip", "0"))
 
 const env = Object.fromEntries(readFileSync(join(ROOT, ".dev.vars"), "utf8").trim().split("\n").map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]))
 const read = (f: string) => JSON.parse(readFileSync(join(ROOT, "data", stylist, f), "utf8"))
@@ -26,7 +27,7 @@ const profile = read("profile.json")
 const tags = read("tags.json")
 let dms = readFileSync(join(ROOT, "data", stylist, file), "utf8").trim().split("\n").map((l) => JSON.parse(l))
 if (args.includes("--only-seeds")) dms = dms.filter((d) => /^(s|c)\d+$/.test(d.id))
-dms = dms.slice(0, limit)
+dms = dms.slice(skip, skip + limit)
 
 const flat = (o: any, p = ""): Record<string, string> =>
   Object.entries(o ?? {}).reduce((acc, [k, v]) => {
