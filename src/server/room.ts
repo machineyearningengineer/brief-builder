@@ -38,7 +38,7 @@ const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 // What a client's phone may see of a message: their words, its status and the stylist's reply.
 const clientView = (m: RoomMessage): RoomMessage => ({
-  ...m, photoTags: null, brief: null, corrected: null, changed: [], requestId: null, ms: null, correctionsUsed: 0, guarded: [],
+  ...m, photoTags: null, brief: null, corrected: null, changed: [], requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
 })
 
 export class StylistRoom extends DurableObject<Env> {
@@ -56,6 +56,7 @@ export class StylistRoom extends DurableObject<Env> {
     // Rooms created before photos existed get the column in place.
     const cols = ctx.storage.sql.exec(`PRAGMA table_info(messages)`).toArray().map((c) => c.name)
     if (!cols.includes("images")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN images TEXT`)
+    if (!cols.includes("baseline")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN baseline TEXT`)
     const row = ctx.storage.sql.exec(`SELECT value FROM meta WHERE key = 'stylist'`).toArray()[0]
     if (row) this.stylist = row.value as StylistKey
   }
@@ -141,10 +142,10 @@ export class StylistRoom extends DurableObject<Env> {
   private save(m: RoomMessage) {
     this.ctx.storage.sql.exec(
       `INSERT OR REPLACE INTO messages (id, client_id, created_at, received_at, text, photo, status, brief, corrected, changed,
-        reply, request_id, ms, corrections_used, guarded, images) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reply, request_id, ms, corrections_used, guarded, images, baseline) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       m.id, m.clientId, m.createdAt, m.receivedAt, m.text, JSON.stringify(m.photoTags), m.status, JSON.stringify(m.brief),
       JSON.stringify(m.corrected), JSON.stringify(m.changed), m.reply, m.requestId, m.ms, m.correctionsUsed, JSON.stringify(m.guarded),
-      JSON.stringify(m.images),
+      JSON.stringify(m.images), JSON.stringify(m.baseline),
     )
     this.broadcast({ type: "message", message: m })
   }
@@ -186,7 +187,7 @@ export class StylistRoom extends DurableObject<Env> {
     const m: RoomMessage = {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
       receivedAt: londonTimestamp(new Date()), text, photoTags: null, images, status: draft ? "drafting" : "failed",
-      brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [],
+      brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
     }
     this.save(m)
     if (draft) this.ctx.waitUntil(this.draft(m))
@@ -206,11 +207,18 @@ export class StylistRoom extends DurableObject<Env> {
       this.save(m)
     }
     const used = closestCorrections(m.text, this.correctionPool())
-    const result = await callBrief({
-      key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low",
-      dm: { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null },
-      corrections: correctionsBlock(used),
-    }).catch((e) => ({ status: 0, ms: 0, requestId: null, brief: null, error: String(e), tokensIn: null, tokensOut: null }))
+    const dm = { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null }
+    const failed = (e: unknown) => ({ status: 0, ms: 0, requestId: null, brief: null, error: String(e), tokensIn: null, tokensOut: null })
+    // The real draft, with this stylist's closest fixes, and the plain model alongside it for
+    // the before-and-after. The plain call is never recorded, so it can't train the adapter.
+    const [result, plain] = await Promise.all([
+      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, corrections: correctionsBlock(used) }).catch(failed),
+      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, record: "off" }).catch(failed),
+    ])
+    const plainBrief = plain.brief as Record<string, any> | null
+    const baseline = plainBrief && typeof plainBrief.reply_draft === "string"
+      ? { reply: plainBrief.reply_draft.replace(/\s*[—–]\s*/g, ", "), nextAction: String(plainBrief.next_action ?? ""), ms: plain.ms }
+      : null
     const brief = result.brief as Record<string, any> | null
     const trusted = new Set((m.photoTags ?? []).filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
     if (brief && m.photoTags) {
@@ -222,7 +230,7 @@ export class StylistRoom extends DurableObject<Env> {
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
-    this.save({ ...m, status: brief ? "drafted" : "failed", brief, requestId: result.requestId, ms: result.ms, correctionsUsed: used.length, guarded })
+    this.save({ ...m, status: brief ? "drafted" : "failed", brief, requestId: result.requestId, ms: result.ms, correctionsUsed: used.length, guarded, baseline })
   }
 
   private async correct(body: { id?: string; corrected?: Record<string, any> }) {
@@ -349,7 +357,7 @@ function toMessage(r: Record<string, any>): RoomMessage {
     id: r.id, clientId: r.client_id, createdAt: r.created_at, receivedAt: r.received_at, text: r.text,
     photoTags: JSON.parse(r.photo), status: r.status, brief: JSON.parse(r.brief), corrected: JSON.parse(r.corrected),
     changed: JSON.parse(r.changed ?? "[]"), reply: r.reply, requestId: r.request_id, ms: r.ms,
-    correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [],
+    correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [], baseline: JSON.parse(r.baseline ?? "null"),
   }
 }
 

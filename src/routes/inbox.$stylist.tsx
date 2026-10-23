@@ -268,6 +268,12 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
             </div>
           </form>
         )}
+        {m.baseline && !m.reply && (
+          <details className="plain pad">
+            <summary className="faint">Without your fixes</summary>
+            <p className="muted">{m.baseline.reply}</p>
+          </details>
+        )}
         {m.status === 'failed' && !m.reply && <p className="muted pad">No draft this time. Reply by hand.</p>}
         {error && <p className="error pad" role="alert">{error}</p>}
       </section>
@@ -406,6 +412,8 @@ const CSS = `
 .send { width: 40px; height: 40px; border-radius: 50%; border: 0; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); flex: none; }
 .send svg { width: 20px; height: 20px; }
 .pad { padding: 0 16px 12px; }
+.plain summary { cursor: pointer; font-size: 13px; }
+.plain p { margin-top: 6px; font-size: 15px; line-height: 1.45; }
 .error { color: var(--bad); }
 .sheet-pane { overflow-y: auto; padding: calc(env(safe-area-inset-top) + 18px) max(18px, env(safe-area-inset-right)) 24px 18px; display: flex; flex-direction: column; gap: 18px; background: var(--surface); }
 .sheet-head { display: grid; gap: 4px; padding-bottom: 4px; }

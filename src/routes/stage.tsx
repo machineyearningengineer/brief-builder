@@ -105,6 +105,20 @@ function Stage() {
               </p>
             )}
             {latest.brief && <p className="muted">{(latest.ms! / 1000).toFixed(1)} s · {latest.correctionsUsed} past fixes used</p>}
+            {latest.brief && latest.baseline && (
+              <div className="versus">
+                <div className="side plain">
+                  <p className="eyebrow">Plain model</p>
+                  <p>{latest.baseline.reply}</p>
+                  <small className="faint">Next step: {latest.baseline.nextAction.replace('_', ' ')}</small>
+                </div>
+                <div className="side ours">
+                  <p className="eyebrow">With {STYLISTS[stylist].name.split(' ')[0]}’s fixes</p>
+                  <p>{(latest.corrected ?? latest.brief).reply_draft}</p>
+                  <small>Next step: {String((latest.corrected ?? latest.brief).next_action).replace('_', ' ')}</small>
+                </div>
+              </div>
+            )}
           </div>
         ) : token && <p className="muted">Scan the QR code and send a DM.</p>}
         <p className="count"><b>{fixes}</b> fixes this session · each one recorded by Mubit for the adapter</p>
@@ -155,6 +169,11 @@ const STAGE_CSS = `
 .latest .dm { font-size: 22px; margin: 0; }
 .facts { margin: 0; font-weight: 600; font-size: 18px; }
 .facts span { color: var(--accent); }
+.versus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 6px; }
+.side { border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; font-size: 15px; line-height: 1.45; }
+.side.plain { background: var(--sunken); color: var(--muted); }
+.side.ours { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+.side.ours small { color: var(--accent); font-weight: 600; }
 .count { margin-top: auto; color: var(--muted); }
 .count b { font: 750 32px var(--display); color: var(--ink); margin-right: 6px; }
 @media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); padding: 20px 16px; } .scores { grid-template-columns: minmax(0, 1fr); } .live { border-left: 0; padding-left: 0; } .stage header { flex-direction: column; align-items: flex-start; } .rule { grid-template-columns: 130px minmax(0, 1fr); } }
