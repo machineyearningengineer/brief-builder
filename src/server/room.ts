@@ -2,6 +2,8 @@
 // corrections in its own SQLite, and pushing every change to the chat, inbox and stage
 // screens over WebSockets.
 import { DurableObject } from "cloudflare:workers"
+import { Schema } from "effect"
+import { briefSchemaFor } from "../shared/brief.ts"
 import braiderProfile from "../../data/braider/profile.json"
 import braiderTags from "../../data/braider/tags.json"
 import braiderCorrections from "../../data/braider/corrections.jsonl?raw"
@@ -19,6 +21,15 @@ const PROFILES = {
 
 const parseJsonl = (s: string): Correction[] => s.trim() ? s.trim().split("\n").map((l) => JSON.parse(l)) : []
 const MAX_DM = 1000
+const MAX_CORRECTION_BYTES = 8_000
+const DM_PER_WINDOW = 8
+const DM_WINDOW_MS = 10 * 60_000
+const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+// What a client's phone may see of a message: their words, its status and the stylist's reply.
+const clientView = (m: RoomMessage): RoomMessage => ({
+  ...m, photoTags: null, brief: null, corrected: null, changed: [], requestId: null, ms: null, correctionsUsed: 0, guarded: [],
+})
 
 export class StylistRoom extends DurableObject<Env> {
   private stylist: StylistKey | null = null
@@ -35,21 +46,34 @@ export class StylistRoom extends DurableObject<Env> {
     if (row) this.stylist = row.value as StylistKey
   }
 
+  // Two kinds of caller. The stylist proves themselves with STYLIST_TOKEN and sees everything.
+  // Anyone else is a client, known only by the random id their phone made, who may send DMs
+  // and sees only their own thread: their messages and the stylist's replies, never briefs.
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const [, , , stylist, action] = url.pathname.split("/") // /api/room/<stylist>/<action>
     this.remember(stylist as StylistKey)
+    const token = request.headers.get("x-stylist-token") ?? url.searchParams.get("token") ?? ""
+    const isStylist = !!this.env.STYLIST_TOKEN && token === this.env.STYLIST_TOKEN
+    const client = url.searchParams.get("client") ?? ""
+
     if (action === "ws") {
       if (request.headers.get("upgrade") !== "websocket") return new Response("Expected a WebSocket", { status: 426 })
+      if (!isStylist && !CLIENT_ID.test(client)) return new Response("Unknown client", { status: 401 })
       const pair = new WebSocketPair()
-      this.ctx.acceptWebSocket(pair[1])
+      this.ctx.acceptWebSocket(pair[1], [isStylist ? "stylist" : `client:${client}`])
       return new Response(null, { status: 101, webSocket: pair[0] })
     }
-    if (action === "state" && request.method === "GET") return Response.json({ messages: this.messages() })
+    if (action === "state" && request.method === "GET") {
+      if (isStylist) return Response.json({ messages: this.messages() })
+      if (!CLIENT_ID.test(client)) return new Response("Unknown client", { status: 401 })
+      return Response.json({ messages: this.messages().filter((m) => m.clientId === client).map(clientView) })
+    }
     if (request.method !== "POST") return new Response("Not found", { status: 404 })
     const body: any = await request.json().catch(() => ({}))
+    if (action === "dm") return this.receiveDm(body)
+    if (!isStylist) return Response.json({ error: "Only the stylist can do that." }, { status: 401 })
     switch (action) {
-      case "dm": return this.receiveDm(body)
       case "correct": return this.correct(body)
       case "reply": return this.reply(body)
       case "reset": return this.reset()
@@ -68,15 +92,21 @@ export class StylistRoom extends DurableObject<Env> {
     this.ctx.storage.sql.exec(`INSERT OR REPLACE INTO meta (key, value) VALUES ('stylist', ?)`, stylist)
   }
 
+  // Stylist screens get every change; a client's phone gets only its own messages, redacted.
   private broadcast(event: RoomEvent) {
-    const data = JSON.stringify(event)
-    for (const ws of this.ctx.getWebSockets()) {
+    const send = (ws: WebSocket, e: RoomEvent) => {
       try {
-        ws.send(data)
+        ws.send(JSON.stringify(e))
       } catch {
         // A closed socket is cleaned up by the runtime.
       }
     }
+    for (const ws of this.ctx.getWebSockets("stylist")) send(ws, event)
+    if (event.type === "reset") {
+      for (const ws of this.ctx.getWebSockets()) if (!this.ctx.getTags(ws).includes("stylist")) send(ws, event)
+      return
+    }
+    for (const ws of this.ctx.getWebSockets(`client:${event.message.clientId}`)) send(ws, { type: "message", message: clientView(event.message) })
   }
 
   private messages(): RoomMessage[] {
@@ -104,7 +134,11 @@ export class StylistRoom extends DurableObject<Env> {
 
   private async receiveDm(body: { clientId?: string; text?: string; photoTags?: RoomMessage["photoTags"] }) {
     const text = String(body.text ?? "").trim().slice(0, MAX_DM)
-    if (!text || !body.clientId) return Response.json({ error: "A message needs text." }, { status: 400 })
+    if (!text) return Response.json({ error: "A message needs text." }, { status: 400 })
+    if (!CLIENT_ID.test(String(body.clientId ?? ""))) return Response.json({ error: "Unknown client." }, { status: 400 })
+    // Each DM costs a Mubit call, so one phone can send a few per window, not a flood.
+    const recent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE client_id = ? AND created_at > ?`, body.clientId, Date.now() - DM_WINDOW_MS).toArray()[0]
+    if (Number(recent?.n ?? 0) >= DM_PER_WINDOW) return Response.json({ error: "That's a lot of messages. Give the stylist a minute to reply." }, { status: 429 })
     const m: RoomMessage = {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
       receivedAt: londonTimestamp(new Date()), text, photoTags: body.photoTags ?? null, status: "drafting",
@@ -132,6 +166,11 @@ export class StylistRoom extends DurableObject<Env> {
   private async correct(body: { id?: string; corrected?: Record<string, any> }) {
     const m = body.id ? this.message(body.id) : null
     if (!m || !m.brief || !body.corrected) return Response.json({ error: "Nothing to correct." }, { status: 400 })
+    // Corrections go into future prompts and Mubit's training data, so only a brief that fits
+    // this stylist's schema, at a sane size, is kept.
+    if (JSON.stringify(body.corrected).length > MAX_CORRECTION_BYTES) return Response.json({ error: "That correction is too large." }, { status: 400 })
+    const decoded = Schema.decodeUnknownExit(briefSchemaFor[this.stylist!])(body.corrected, { onExcessProperty: "error" })
+    if (decoded._tag !== "Success") return Response.json({ error: "That correction doesn't fit the brief." }, { status: 400 })
     const changed = diffPaths(m.brief, body.corrected)
     const correction: Correction = {
       id: m.id, received_at: m.receivedAt, text: m.text,
