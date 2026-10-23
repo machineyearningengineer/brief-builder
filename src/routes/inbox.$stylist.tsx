@@ -295,7 +295,7 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
               </label>
             </div>
 
-            <p className="drafted faint">Drafted by gpt-6-luna through Mubit in {m.ms ? (m.ms / 1000).toFixed(1) : '–'} s, using {m.correctionsUsed} of your past fixes.{m.requestId && <> <span className="mono">{m.requestId}</span></>}</p>
+            <p className="drafted faint">Drafted by gpt-6-luna through Mubit{m.ms ? ` in ${(m.ms / 1000).toFixed(1)} s` : ''}, using {m.correctionsUsed} of your past fixes.{m.requestId && <> <span className="mono">{m.requestId}</span></>}</p>
           </>
         )}
       </section>

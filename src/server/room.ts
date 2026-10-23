@@ -214,6 +214,9 @@ export class StylistRoom extends DurableObject<Env> {
     const brief = result.brief as Record<string, any> | null
     const trusted = new Set((m.photoTags ?? []).filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
     const guarded = brief ? guardEvidence(brief, m.text, trusted) : []
+    // House style for replies: no em dashes. Tidied here, not in the instructions, so the
+    // Mubit task (keyed on the exact instructions) keeps its examples.
+    if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
     this.save({ ...m, status: brief ? "drafted" : "failed", brief, requestId: result.requestId, ms: result.ms, correctionsUsed: used.length, guarded })
   }
 
