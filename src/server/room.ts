@@ -266,6 +266,14 @@ export class StylistRoom extends DurableObject<Env> {
     if (!bytes || bytes.byteLength === 0) return Response.json({ error: "That photo is too large." }, { status: 413 })
     const mime = sniffImage(new Uint8Array(bytes.slice(0, 12)))
     if (!mime) return Response.json({ error: "Only photos can be attached." }, { status: 415 })
+    // Re-check both limits now the body is in, with no await before the insert, so uploads
+    // that were in flight together can't all slip past the earlier check.
+    const since = Date.now() - DM_WINDOW_MS
+    const mineNow = Number(this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM images WHERE client_id = ? AND created_at > ?`, client, since).toArray()[0]?.n ?? 0)
+    const roomNow = Number(this.ctx.storage.sql.exec(`SELECT COALESCE(SUM(length(bytes)), 0) AS n FROM images WHERE created_at > ?`, since).toArray()[0]?.n ?? 0)
+    if (mineNow >= IMAGES_PER_WINDOW || roomNow + bytes.byteLength > ROOM_IMAGE_BYTES_PER_WINDOW) {
+      return Response.json({ error: "That's a lot of photos. Try again in a few minutes." }, { status: 429 })
+    }
     const id = crypto.randomUUID()
     this.ctx.storage.sql.exec(`INSERT INTO images (id, client_id, mime, bytes, created_at) VALUES (?, ?, ?, ?, ?)`, id, client, mime, bytes, Date.now())
     return Response.json({ id })
