@@ -48,7 +48,9 @@ function InboxPage() {
   const { stylist } = Route.useParams() as { stylist: StylistKey }
   const [token, setToken] = useState('')
   const [draftKey, setDraftKey] = useState('')
-  useEffect(() => setToken(stylistToken.get()), [])
+  useEffect(() => {
+    setToken(stylistToken.get())
+  }, [])
   const { messages, connected, denied } = useRoom(stylist, token ? { token } : null)
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -106,7 +108,9 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
   const [reply, setReply] = useState('')
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => setReply(m.reply ?? brief?.reply_draft ?? ''), [m.id, m.status, brief?.reply_draft])
+  useEffect(() => {
+    setReply(m.reply ?? brief?.reply_draft ?? '')
+  }, [m.id, m.status, brief?.reply_draft])
 
   const correct = async (path: string, value: string) => {
     if (!brief) return

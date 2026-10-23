@@ -142,21 +142,23 @@ export class StylistRoom extends DurableObject<Env> {
     if (!text) return Response.json({ error: "A message needs text." }, { status: 400 })
     if (!CLIENT_ID.test(String(body.clientId ?? ""))) return Response.json({ error: "Unknown client." }, { status: 400 })
     // Each DM costs a Mubit call, so one phone can send a few per window, not a flood.
-    // Client ids are self-chosen, so a room-wide cap backs up the per-phone one. There's no
-    // per-IP limit: every judge on the venue Wi-Fi shares one address.
+    // One phone past its limit is refused. Past the room-wide cap (client ids are self-chosen)
+    // DMs are still accepted and shown to the stylist, just not drafted, so a flood caps the
+    // Mubit cost without locking real clients out. No per-IP limit: venue Wi-Fi shares one address.
     const since = Date.now() - DM_WINDOW_MS
     const recent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE client_id = ? AND created_at > ?`, body.clientId, since).toArray()[0]
-    const roomRecent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE created_at > ?`, since).toArray()[0]
-    if (Number(recent?.n ?? 0) >= DM_PER_WINDOW || Number(roomRecent?.n ?? 0) >= DM_PER_ROOM_WINDOW) {
+    if (Number(recent?.n ?? 0) >= DM_PER_WINDOW) {
       return Response.json({ error: "That's a lot of messages. Give the stylist a minute to reply." }, { status: 429 })
     }
+    const roomRecent = this.ctx.storage.sql.exec(`SELECT COUNT(*) AS n FROM messages WHERE created_at > ?`, since).toArray()[0]
+    const draft = Number(roomRecent?.n ?? 0) < DM_PER_ROOM_WINDOW
     const m: RoomMessage = {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
-      receivedAt: londonTimestamp(new Date()), text, photoTags: body.photoTags ?? null, status: "drafting",
+      receivedAt: londonTimestamp(new Date()), text, photoTags: body.photoTags ?? null, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [],
     }
     this.save(m)
-    this.ctx.waitUntil(this.draft(m))
+    if (draft) this.ctx.waitUntil(this.draft(m))
     return Response.json({ message: m })
   }
 

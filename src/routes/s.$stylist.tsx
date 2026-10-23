@@ -38,9 +38,14 @@ function ChatPage() {
   const [error, setError] = useState('')
   const end = useRef<HTMLDivElement>(null)
 
-  useEffect(() => setMe(clientId()), [])
+  useEffect(() => {
+    setMe(clientId())
+  }, [])
   const mine = useMemo(() => messages.filter((m) => m.clientId === me), [messages, me])
-  useEffect(() => end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }), [mine.length, mine.at(-1)?.reply])
+  // Braces matter: scrollIntoView returns a Promise in newer browsers, and an effect must not.
+  useEffect(() => {
+    end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
+  }, [mine.length, mine.at(-1)?.reply])
 
   const send = async (e: { preventDefault: () => void }) => {
     e.preventDefault()
