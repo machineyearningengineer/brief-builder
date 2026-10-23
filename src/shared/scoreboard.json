@@ -62,5 +62,69 @@
       }
     },
     "adapter": null
+  },
+  "colourist": {
+    "stylist": "colourist",
+    "testSet": "20 locked DMs, never recorded by Mubit",
+    "rules": {
+      "4": "\"Under £X\" is a ceiling, never a quote. Quote the real price.",
+      "5": "Never confirm a booking from a DM: offer specific slots instead.",
+      "7": "\"Me and my mum\" sets people; under-16s are referred elsewhere.",
+      "9": "Day words resolve against the message's received time.",
+      "10": "The reply asks at most two questions, most important first.",
+      "11": "Photo tags under 0.6 confidence aren't used. Text beats photo; a clash on length or shade becomes a question.",
+      "12": "New colour clients need a patch test at least 48 hours before; never offer a colour slot sooner.",
+      "13": "Toner is included with balayage and highlights; a toner on its own is a separate £45 service.",
+      "14": "\"Lived-in blonde\" means a soft-root balayage, not all-over blonde.",
+      "15": "Box-dyed or previously lightened hair needs a free consultation before any quote (roots and toners excepted).",
+      "16": "Going from naturally dark to blonde can take two sessions; say so."
+    },
+    "base": {
+      "label": "gpt-6-luna",
+      "run": "2026-10-23T21-45-18-829Z-colourist-heldout-low.jsonl",
+      "briefs": 20,
+      "fullyRight": 0,
+      "nextAction": 55,
+      "fields": 88,
+      "p50ms": 24821,
+      "tokensPerBrief": 1517,
+      "nextActionByRule": {
+        "4": 100,
+        "5": 0,
+        "7": 50,
+        "9": 64,
+        "10": 100,
+        "11": 25,
+        "12": 10,
+        "13": 50,
+        "14": 75,
+        "15": 100,
+        "16": 67
+      }
+    },
+    "corrected": {
+      "label": "gpt-6-luna + stylist fixes",
+      "run": "2026-10-23T21-46-58-577Z-colourist-heldout-low-corrected.jsonl",
+      "briefs": 20,
+      "fullyRight": 35,
+      "nextAction": 60,
+      "fields": 93,
+      "p50ms": 21635,
+      "tokensPerBrief": 1922,
+      "nextActionByRule": {
+        "4": 100,
+        "5": 33,
+        "7": 50,
+        "9": 73,
+        "10": 100,
+        "11": 50,
+        "12": 30,
+        "13": 50,
+        "14": 50,
+        "15": 80,
+        "16": 33
+      }
+    },
+    "adapter": null
   }
 }

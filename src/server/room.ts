@@ -9,6 +9,7 @@ import braiderTags from "../../data/braider/tags.json"
 import braiderCorrections from "../../data/braider/corrections.jsonl?raw"
 import colouristProfile from "../../data/colourist/profile.json"
 import colouristTags from "../../data/colourist/tags.json"
+import colouristCorrections from "../../data/colourist/corrections.jsonl?raw"
 import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
 import { closestCorrections, correctionsBlock, type Correction } from "./corrections.ts"
@@ -16,7 +17,7 @@ import { guardEvidence } from "./guards.ts"
 
 const PROFILES = {
   braider: { profile: braiderProfile, tags: braiderTags, seedCorrections: braiderCorrections },
-  colourist: { profile: colouristProfile, tags: colouristTags, seedCorrections: "" },
+  colourist: { profile: colouristProfile, tags: colouristTags, seedCorrections: colouristCorrections },
 } as const
 
 const parseJsonl = (s: string): Correction[] => s.trim() ? s.trim().split("\n").map((l) => JSON.parse(l)) : []
