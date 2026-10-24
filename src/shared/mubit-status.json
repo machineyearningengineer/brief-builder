@@ -1,5 +1,5 @@
 {
-  "checkedAt": "Sat 24 Oct, 11:56",
+  "checkedAt": "Sat 24 Oct, 15:30",
   "note": "Read by hand from the Mubit console (Adapters page); adapters can't be called by API. next is the Adapters page's own 'Next:' line, or null until read.",
   "adapters": {
     "braider": {
@@ -27,12 +27,12 @@
     "nails": {
       "version": "v1",
       "base": "Qwen3-4B-Instruct",
-      "quality": null,
+      "quality": 43,
       "target": 95,
-      "tests": null,
+      "tests": 14,
       "kept": 25,
-      "state": "Training v1 now",
-      "next": "First version training on her kept examples.",
+      "state": "Silent test on 10% of live calls",
+      "next": "Exam not passed yet; v1 stays on a silent test while more of her examples come in.",
       "calls": 115
     }
   }
