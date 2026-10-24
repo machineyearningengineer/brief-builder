@@ -1,8 +1,8 @@
 // The client's side: a DM thread with the stylist, built to feel like a messaging app on a
 // phone or iPad. Photos can be attached, pasted or dropped anywhere on the screen.
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { Link, createFileRoute, notFound } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CloseIcon, InfoIcon, PhotoIcon, SendIcon } from '../client/icons.tsx'
+import { BackIcon, CloseIcon, InfoIcon, PhotoIcon, SendIcon } from '../client/icons.tsx'
 import { isImage, shrinkImage, type Pending } from '../client/images.ts'
 import { clientId, post, uploadImage, useRoom } from '../client/room.ts'
 import { MENU, POLICIES, WORK } from '../shared/menu.ts'
@@ -29,6 +29,18 @@ function ChatPage() {
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const [sheet, setSheet] = useState(false)
+  const [closing, setClosing] = useState(false)
+  // The drawer slides back down before it goes, the way it came up.
+  const closeSheet = useCallback((then?: () => void) => {
+    setClosing(true)
+    window.setTimeout(() => { setSheet(false); setClosing(false); then?.() }, 220)
+  }, [])
+  useEffect(() => {
+    if (!sheet) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeSheet() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [sheet, closeSheet])
   const [dragging, setDragging] = useState(false)
   const end = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -125,6 +137,7 @@ function ChatPage() {
   return (
     <div className="dm-app">
       <header className="dm-bar">
+        <Link to="/" className="icon-btn" aria-label="All stylists"><BackIcon /></Link>
         <button className="who" onClick={() => setSheet(true)} aria-label={`About ${info.name}`}>
           <span className="avatar" aria-hidden="true">{info.name.slice(0, 1)}</span>
           <span className="names">
@@ -206,8 +219,8 @@ function ChatPage() {
       {dragging && <div className="drop fade" aria-hidden="true"><PhotoIcon /><p>Drop photos to add them</p></div>}
 
       {sheet && (
-        <div className="scrim fade" onClick={() => setSheet(false)}>
-          <section className="sheet" role="dialog" aria-modal="true" aria-label={`${info.name} services`} onClick={(e) => e.stopPropagation()}>
+        <div className={closing ? 'scrim out' : 'scrim fade'} onClick={() => closeSheet()}>
+          <section className={closing ? 'sheet out' : 'sheet'} role="dialog" aria-modal="true" aria-label={`${info.name} services`} onClick={(e) => e.stopPropagation()}>
             <div className="grab" aria-hidden="true" />
             <header>
               <span className="avatar big" aria-hidden="true">{info.name.slice(0, 1)}</span>
@@ -215,7 +228,7 @@ function ChatPage() {
                 <h2>{info.name}</h2>
                 <p className="muted">{info.craft} · {info.area}</p>
               </div>
-              <button className="icon-btn" onClick={() => setSheet(false)} aria-label="Close"><CloseIcon /></button>
+              <button className="icon-btn" onClick={() => closeSheet()} aria-label="Close"><CloseIcon /></button>
             </header>
             <div className="work wide">{WORK[stylist].map((w) => <img key={w.src} src={w.src} alt={w.alt} loading="lazy" />)}</div>
             {MENU[stylist].map((s) => (
@@ -233,7 +246,7 @@ function ChatPage() {
               <h3 className="eyebrow">Good to know</h3>
               <ul className="policies">{POLICIES[stylist].map((p) => <li key={p}>{p}</li>)}</ul>
             </div>
-            <button className="btn primary full" onClick={() => { setSheet(false); box.current?.focus() }}>Message {info.owner}</button>
+            <button className="btn primary full" onClick={() => closeSheet(() => box.current?.focus())}>Message {info.owner}</button>
           </section>
         </div>
       )}
@@ -291,7 +304,11 @@ const CSS = `
 .drop svg { width: 40px; height: 40px; }
 .scrim { position: fixed; inset: 0; background: oklch(0% 0 0 / 0.4); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
 .sheet { background: var(--surface); width: min(560px, 100%); max-height: 88dvh; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 8px 20px calc(env(safe-area-inset-bottom) + 20px); display: grid; gap: 18px; box-shadow: var(--shadow); }
-@media (prefers-reduced-motion: no-preference) { .sheet { animation: sheet-up 280ms var(--ease) both; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet { animation: sheet-up 280ms var(--ease) both; }
+  .sheet.out { animation: sheet-down 220ms var(--ease) both; }
+  .scrim.out { animation: fade 220ms var(--ease) reverse both; }
+}
 .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line); justify-self: center; }
 .sheet header { display: flex; gap: 14px; align-items: center; }
 .sheet header div { flex: 1; }

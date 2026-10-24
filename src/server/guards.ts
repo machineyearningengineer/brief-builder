@@ -88,6 +88,12 @@ export function carryForward(brief: Record<string, any>, before: Record<string, 
     brief.evidence[path] = "[earlier]"
     carried.push(path)
   }
+  // The day carries too: "does that include the hair?" is still about Saturday.
+  const when = brief.when ?? {}
+  if (!(when.dates?.length) && !when.window && (before.when?.dates?.length || before.when?.window)) {
+    brief.when = { dates: [...(before.when.dates ?? [])], window: before.when.window ?? null }
+    carried.push("when")
+  }
   return carried
 }
 

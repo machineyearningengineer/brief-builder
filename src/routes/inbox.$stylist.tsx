@@ -1,7 +1,7 @@
 // The stylist's inbox, laid out like an iPad mail app: conversations, the DM thread with the
 // reply, and the brief as a salon service sheet where every field is a one-tap correction.
 // Three columns on a wide iPad, two on a smaller one, and a slide-in thread on a phone.
-import { createFileRoute, notFound } from '@tanstack/react-router'
+import { Link, createFileRoute, notFound } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import braiderTags from '../../data/braider/tags.json'
 import colouristTags from '../../data/colourist/tags.json'
@@ -151,6 +151,7 @@ function InboxPage() {
     <div className="mail" data-open={selected ? 'thread' : 'list'}>
       <aside className="list" aria-label="Conversations">
         <header>
+          <Link to="/" className="icon-btn home" aria-label="All stylists"><BackIcon /></Link>
           <div>
             <h1>Messages</h1>
             <small className={connected ? 'live on' : 'live'}>{connected ? `${STYLISTS[stylist].name} · live` : 'Reconnecting…'}</small>
@@ -553,7 +554,9 @@ const CSS = `
 .mail { height: 100dvh; display: grid; grid-template-columns: 320px minmax(0, 1fr); background: var(--bg); }
 .detail { display: grid; grid-template-columns: minmax(0, 1fr) 380px; height: 100dvh; min-width: 0; }
 .list { border-right: 1px solid var(--line); overflow-y: auto; padding: calc(env(safe-area-inset-top) + 14px) 10px 14px max(10px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 2px; }
-.list header { display: flex; justify-content: space-between; align-items: center; padding: 0 8px 12px; }
+.list header { display: flex; align-items: center; gap: 4px; padding: 0 8px 12px; }
+.list header > div { flex: 1; min-width: 0; }
+.list header .home { margin-left: -10px; }
 .list h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .live { color: var(--faint); font-size: 13px; }
 .tools { display: flex; gap: 4px; align-items: center; }

@@ -106,6 +106,7 @@ mark { background: var(--mark); color: inherit; border-radius: 4px; padding: 0 2
 @keyframes settle { from { transform: scale(0.94); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheet-down { from { transform: none; } to { transform: translateY(100%); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes blink { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
 @media (prefers-reduced-motion: no-preference) {
@@ -117,3 +118,12 @@ mark { background: var(--mark); color: inherit; border-radius: 4px; padding: 0 2
   .dots i:nth-child(2) { animation-delay: 0.15s; }
   .dots i:nth-child(3) { animation-delay: 0.3s; }
 }
+
+/* Explanations on hover, focus or tap (src/client/tip.tsx). */
+.tip { position: relative; display: inline; cursor: help; outline: none; }
+.tip-mark { width: 17px; height: 17px; border-radius: 17px; display: inline-grid; place-items: center; margin-left: 6px; vertical-align: 2px; font-size: 11px; font-weight: 700; color: var(--muted); border: 1px solid var(--line); }
+.tip:hover .tip-mark, .tip:focus-visible .tip-mark { color: var(--accent); border-color: var(--accent); }
+.tip-body { position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 20; width: max-content; max-width: 300px; padding: 10px 12px; border-radius: 12px; background: var(--ink); color: var(--bg); font-size: 14px; font-weight: 400; line-height: 1.4; text-align: left; box-shadow: var(--shadow); opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity 140ms var(--ease), transform 140ms var(--ease); }
+.tip.end .tip-body { left: auto; right: 0; }
+.tip:hover .tip-body, .tip:focus .tip-body, .tip:focus-within .tip-body { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .tip-body { transition: none; } }

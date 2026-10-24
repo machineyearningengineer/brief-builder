@@ -1,6 +1,7 @@
 // The front page: what it does, the measured result, and the three stylists to message.
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { ChatIcon, InboxIcon, PinIcon } from '../client/icons.tsx'
+import { Tip } from '../client/tip.tsx'
 import scoreboard from '../shared/scoreboard.json'
 import { STYLISTS, type StylistKey } from '../shared/stylists.ts'
 
@@ -35,10 +36,9 @@ function Home() {
         <section className="proof" aria-label="Results">
           <div className="big">
             <span className="num">{hero.now}%</span>
-            <span className="what">of replies fully right on DMs it never trained on</span>
+            <span className="what"><Tip tip="Every detail of the brief matches what she would have written: service, look, day, price details and what to do next. Measured on 60 test DMs Mubit never trained on.">of replies fully right on DMs it never trained on</Tip></span>
           </div>
           <Steps {...hero} />
-          <p className="muted small">Amara Braids, 60 locked test DMs. Plain model, then her fixes, then her rules in code.</p>
         </section>
       )}
 
@@ -97,9 +97,9 @@ function Steps({ plain, fixes, now }: { plain: number; fixes: number; now: numbe
     <div className="steps">
       <div className="track"><i className="now" style={{ width: `${now}%` }} /><i className="fixes" style={{ width: `${fixes}%` }} /><i className="plain" style={{ width: `${plain}%` }} /></div>
       <dl>
-        <div><dt>Plain model</dt><dd>{plain}%</dd></div>
-        <div><dt>With her fixes</dt><dd>{fixes}%</dd></div>
-        <div><dt>With her rules in code</dt><dd className="accent">{now}%</dd></div>
+        <div><dt><Tip tip="gpt-6-luna on its own, with her prices and house rules in its instructions.">Plain model</Tip></dt><dd>{plain}%</dd></div>
+        <div><dt><Tip tip="Her closest past fixes go into each draft as worked examples.">Her fixes</Tip></dt><dd>{fixes}%</dd></div>
+        <div><dt><Tip tip="Code decides the next step, what’s missing, dates and time windows, following her rules exactly." align="end">Her rules in code</Tip></dt><dd className="accent">{now}%</dd></div>
       </dl>
     </div>
   )
