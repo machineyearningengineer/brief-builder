@@ -167,7 +167,10 @@ export class StylistRoom extends DurableObject<Env> {
       .map((x) => {
         const b = { ...(x.corrected ?? x.brief)! }
         if (x.reply) b.reply_draft = x.reply
-        return { dm: { received_at: x.receivedAt, text: x.text, photo: x.photoTags ? { reader_output: x.photoTags } : null }, brief: b }
+        // A photo tag the turn's final brief contradicts (the stylist fixed it) isn't resent,
+        // so the model can't pick the reader's guess over her fix.
+        const tags = x.photoTags?.filter((t) => agrees(b, t)) ?? null
+        return { dm: { received_at: x.receivedAt, text: x.text, photo: tags ? { reader_output: tags } : null }, brief: b }
       })
   }
 
@@ -269,7 +272,7 @@ export class StylistRoom extends DurableObject<Env> {
     // Evidence can come from any message in the conversation, not just the newest one.
     const said = [...history.map((h) => h.dm.text), m.text].join("\n")
     const guarded = brief ? guardEvidence(brief, said, trusted) : []
-    if (brief) carryForward(brief, history.at(-1)?.brief ?? null)
+    if (brief) carryForward(brief, history.at(-1)?.brief ?? null, m.text)
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
@@ -385,6 +388,11 @@ export class StylistRoom extends DurableObject<Env> {
 // Which trusted photo tags the stylist overruled in a correction. A scalar field counts when
 // the stylist changed what the photo put there; an extra counts when the stylist removed it,
 // paired with whatever extra they added instead ("none" if they only removed it).
+function agrees(brief: Record<string, any>, t: { field: string; tag: string }) {
+  const v = t.field === "service" ? brief.service : brief.look?.[t.field]
+  return v === undefined || v === "unknown" || v === t.tag || (Array.isArray(v) && v.includes(t.tag))
+}
+
 function readerFixes(tags: RoomMessage["photoTags"], before: any, after: any, threshold: number): ReaderFix[] {
   const out: ReaderFix[] = []
   for (const t of tags ?? []) {

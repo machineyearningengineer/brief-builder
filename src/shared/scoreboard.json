@@ -126,5 +126,68 @@
       }
     },
     "adapter": null
+  },
+  "nails": {
+    "stylist": "nails",
+    "testSet": "24 locked DMs, never recorded by Mubit",
+    "rules": {
+      "4": "\"Under £X\" is a ceiling, never a quote. Quote the real price.",
+      "5": "Never confirm a booking from a DM: offer specific slots instead.",
+      "7": "\"Me and my bestie\" sets people; under-12s are referred elsewhere.",
+      "9": "Day words resolve against the message's received time.",
+      "10": "The reply asks at most two questions, most important first.",
+      "11": "Photo tags under 0.6 confidence aren't used. Text beats photo; a clash on length or shape becomes a question.",
+      "17": "Gel or acrylic from another salon needs a £10 soak-off; removing my own work is free. If it's unclear whether they have product on, ask.",
+      "18": "Bitten or very short nails: ask for a photo of their nails now before booking extensions.",
+      "19": "Green or yellow patches, lifting with discolouration, or a suspected infection: don't book. Refer them to a pharmacist or GP, kindly.",
+      "20": "\"Ballerina\" means coffin shape.",
+      "21": "Infills are only within 3 weeks of the set; after that it's a new full set.",
+      "22": "A design from Pinterest or TikTok needs a photo of it before art is quoted."
+    },
+    "base": {
+      "label": "gpt-6-luna",
+      "run": "2026-10-24T03-10-31-013Z-nails-heldout-low.jsonl",
+      "briefs": 24,
+      "fullyRight": 29,
+      "nextAction": 42,
+      "fields": 92,
+      "p50ms": 5000,
+      "tokensPerBrief": 1456,
+      "nextActionByRule": {
+        "4": 0,
+        "5": 50,
+        "7": 67,
+        "9": 71,
+        "17": 20,
+        "18": 100,
+        "19": 100,
+        "20": 0,
+        "21": 0,
+        "22": 100
+      }
+    },
+    "corrected": {
+      "label": "gpt-6-luna + stylist fixes",
+      "run": "2026-10-24T03-11-26-468Z-nails-heldout-low-corrected.jsonl",
+      "briefs": 24,
+      "fullyRight": 58,
+      "nextAction": 63,
+      "fields": 96,
+      "p50ms": 4168,
+      "tokensPerBrief": 1766,
+      "nextActionByRule": {
+        "4": 50,
+        "5": 67,
+        "7": 100,
+        "9": 71,
+        "17": 40,
+        "18": 100,
+        "19": 100,
+        "20": 0,
+        "21": 0,
+        "22": 100
+      }
+    },
+    "adapter": null
   }
 }
