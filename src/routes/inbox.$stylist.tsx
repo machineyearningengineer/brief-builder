@@ -2,7 +2,7 @@
 // reply, and the brief as a salon service sheet where every field is a one-tap correction.
 // Three columns on a wide iPad, two on a smaller one, and a slide-in thread on a phone.
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import braiderTags from '../../data/braider/tags.json'
 import colouristTags from '../../data/colourist/tags.json'
 import { BackIcon, SendIcon, SunMoonIcon } from '../client/icons.tsx'
@@ -189,47 +189,78 @@ function Photos({ ids, stylist, token }: { ids: string[]; stylist: StylistKey; t
   return <div className={`photos n${Math.min(ids.length, 4)}`}>{urls.map((u) => <img key={u} src={u} alt="Photo from the client" />)}</div>
 }
 
+// A fix waits five seconds so a mis-tap can be undone; any change made in that window joins
+// the same fix. Short option lists are one-tap choices; long ones stay as dropdowns.
+const UNDO_MS = 5000
+const ONE_TAP_MAX = 5
+type Pending = { next: Record<string, any>; labels: string[] }
+
+const setPath = (o: any, path: string, value: unknown) => {
+  const keys = path.split('.')
+  const last = keys.pop()!
+  keys.reduce((v: any, k) => v[k], o)[last] = value
+}
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+
 function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: StylistKey; token: string; onBack: () => void }) {
-  const brief = m.corrected ?? m.brief
+  const saved = m.corrected ?? m.brief
+  const [pending, setPending] = useState<Pending | null>(null)
+  const [left, setLeft] = useState(0)
+  const [note, setNote] = useState('')
   const [reply, setReply] = useState('')
-  const [saved, setSaved] = useState('')
   const [error, setError] = useState('')
-  useEffect(() => {
-    setReply(m.reply ?? brief?.reply_draft ?? '')
-  }, [m.id, m.status, brief?.reply_draft])
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pendingRef = useRef<Pending | null>(null)
+  const brief = pending?.next ?? saved
   const price = estimate(stylist, brief)
   const threshold = 0.6
 
-  const toggleExtra = async (extra: string, on: boolean) => {
-    if (!brief) return
-    const next = structuredClone(brief)
-    const list: string[] = next.look?.extras ?? []
-    next.look.extras = on ? [...list, extra] : list.filter((x) => x !== extra)
+  useEffect(() => {
+    setReply(m.reply ?? saved?.reply_draft ?? '')
+  }, [m.id, m.status, saved?.reply_draft])
+
+  const commit = async (p: Pending) => {
+    if (timer.current) clearInterval(timer.current)
+    pendingRef.current = null
+    setPending(null)
     setError('')
     try {
-      await post(stylist, 'correct', { id: m.id, corrected: next }, token)
-      setSaved(`Extras fixed. Sent to Mubit.`)
-      setTimeout(() => setSaved(''), 2600)
+      await post(stylist, 'correct', { id: m.id, corrected: p.next }, token)
+      setNote(`${p.labels.join(', ')} fixed. Sent to Mubit.`)
+      setTimeout(() => setNote(''), 3000)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That correction didn’t save.')
     }
   }
 
-  const correct = async (path: string, value: string, label: string) => {
-    if (!brief) return
-    const next = structuredClone(brief)
-    const keys = path.split('.')
-    const last = keys.pop()!
-    const parent = keys.reduce((v: any, k) => v[k], next)
-    parent[last] = value
-    setError('')
-    try {
-      await post(stylist, 'correct', { id: m.id, corrected: next }, token)
-      setSaved(`${label} fixed. Sent to Mubit.`)
-      setTimeout(() => setSaved(''), 2600)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'That correction didn’t save.')
-    }
+  // Leaving the message mid-countdown still saves the fix.
+  useEffect(() => () => {
+    if (timer.current) clearInterval(timer.current)
+    const p = pendingRef.current
+    if (p) void post(stylist, 'correct', { id: m.id, corrected: p.next }, token).catch(() => {})
+  }, [m.id])
+
+  const change = (label: string, mutate: (b: Record<string, any>) => void) => {
+    if (!saved) return
+    const next = structuredClone(pendingRef.current?.next ?? saved)
+    mutate(next)
+    const p = { next, labels: [...new Set([...(pendingRef.current?.labels ?? []), label])] }
+    pendingRef.current = p
+    setPending(p)
+    const deadline = Date.now() + UNDO_MS
+    setLeft(Math.ceil(UNDO_MS / 1000))
+    if (timer.current) clearInterval(timer.current)
+    timer.current = setInterval(() => {
+      const s = Math.ceil((deadline - Date.now()) / 1000)
+      if (s <= 0) void commit(p)
+      else setLeft(s)
+    }, 200)
+  }
+
+  const undo = () => {
+    if (timer.current) clearInterval(timer.current)
+    pendingRef.current = null
+    setPending(null)
   }
 
   const send = async () => {
@@ -241,22 +272,68 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
     }
   }
 
-  const select = (f: Field) => {
+  // Where a value came from: the stylist, the photo (with its confidence) or the client's words.
+  const source = (path: string, fixed: boolean, original: unknown) => {
+    if (fixed) return `Your fix · was ${words(original) || 'not set'}`
+    const ev = m.brief?.evidence?.[path]
+    if (ev === '[photo]') {
+      const t = m.photoTags?.find((x) => x.field === path.split('.').pop())
+      return t ? `From photo · ${Math.round(t.confidence * 100)}%` : 'From photo'
+    }
+    return ev ? `“${clip(String(ev), 26)}”` : ''
+  }
+
+  const field = (f: Field) => {
     const value = get(brief, f.path) ?? 'unknown'
     const original = get(m.brief, f.path) ?? 'unknown'
-    const fixed = !!m.corrected && String(value) !== String(original)
+    const fixed = String(value) !== String(original)
+    const set = (v: string) => change(f.label, (b) => setPath(b, f.path, v))
     return (
-      <label key={f.path} className={fixed ? 'line fixed' : 'line'}>
-        <span className="k">{f.label}</span>
+      <div key={f.path} className={fixed ? 'line fixed' : 'line'}>
+        <span className="k">{f.label}<small className="src">{source(f.path, fixed, original)}</small></span>
         <span className="v">
-          {fixed && <s>{words(original) || 'not set'}</s>}
-          <select value={value} onChange={(e) => correct(f.path, e.target.value, f.label)} aria-label={`${f.label}: change to correct it`}>
-            <option value="unknown">Not set, ask</option>
-            {f.options.map((o) => <option key={o} value={o}>{words(o)}</option>)}
-          </select>
+          {f.options.length <= ONE_TAP_MAX ? (
+            <span className="seg" role="radiogroup" aria-label={f.label}>
+              {f.options.map((o) => (
+                <button key={o} type="button" role="radio" aria-checked={value === o} className={value === o ? 'on' : ''} onClick={() => set(value === o ? 'unknown' : o)}>{words(o)}</button>
+              ))}
+            </span>
+          ) : (
+            <select value={value} onChange={(e) => set(e.target.value)} aria-label={`${f.label}: change to correct it`}>
+              <option value="unknown">Not set, ask</option>
+              {f.options.map((o) => <option key={o} value={o}>{words(o)}</option>)}
+            </select>
+          )}
           {m.guarded.includes(f.path) && <small className="faint">Cleared: no source in the DM</small>}
         </span>
-      </label>
+      </div>
+    )
+  }
+
+  const extras = () => {
+    const on: string[] = brief?.look?.extras ?? []
+    const was: string[] = m.brief?.look?.extras ?? []
+    const removed = was.filter((x) => !on.includes(x))
+    const rest = braiderTags.fields.extras.filter((x) => !on.includes(x))
+    const fromPhoto = m.brief?.evidence?.['look.extras'] === '[photo]'
+    return (
+      <div className="line extras">
+        <span className="k">Extras<small className="src">{removed.length || on.some((x) => !was.includes(x)) ? 'Your fix' : fromPhoto ? 'From photo' : ''}</small></span>
+        <span className="v">
+          {on.map((x) => (
+            <button key={x} type="button" className={was.includes(x) ? 'chip' : 'chip added'} onClick={() => change('Extras', (b) => { b.look.extras = on.filter((y) => y !== x) })} aria-label={`Remove ${words(x)}`}>
+              {words(x)} <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          {removed.map((x) => <s key={x} className="faint">{words(x)}</s>)}
+          {rest.length > 0 && (
+            <select value="" onChange={(e) => { const x = e.target.value; if (x) change('Extras', (b) => { b.look.extras = [...on, x] }) }} aria-label="Add an extra">
+              <option value="">Add…</option>
+              {rest.map((x) => <option key={x} value={x}>{words(x)}</option>)}
+            </select>
+          )}
+        </span>
+      </div>
     )
   }
 
@@ -271,15 +348,17 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
         <div className="convo">
           <Photos ids={m.images} stylist={stylist} token={token} />
           {m.text && <p className="bubble in">{highlight(m.text, Object.values(brief?.evidence ?? {}) as string[])}</p>}
-          {m.status === 'drafting' && <p className="muted typing"><span className="dots"><i /><i /><i /></span> Drafting the brief</p>}
+          {m.status === 'drafting' && <p className="muted typing"><span className="dots"><i /><i /><i /></span> Reading the message{m.images.length ? ' and photo' : ''}</p>}
           {m.reply && <p className="bubble out rise">{m.reply}</p>}
         </div>
-        {!m.reply && brief && (
+        {!m.reply && saved && (
           <form className="reply" onSubmit={(e) => { e.preventDefault(); void send() }}>
-            <label htmlFor="reply" className="eyebrow">Draft reply</label>
-            <div className="reply-box">
-              <textarea id="reply" rows={4} value={reply} onChange={(e) => setReply(e.target.value)} />
-              <button type="submit" className="send on" disabled={!reply.trim()} aria-label="Send reply"><SendIcon /></button>
+            <label htmlFor="reply" className="eyebrow">{m.redrafting ? 'Updating the reply from your fix' : 'Draft reply'}</label>
+            <div className={m.redrafting ? 'reply-box busy' : 'reply-box'}>
+              <textarea id="reply" rows={4} value={reply} onChange={(e) => setReply(e.target.value)} disabled={m.redrafting} />
+              <button type="submit" className="send on" disabled={!reply.trim() || m.redrafting} aria-label="Send reply">
+                {m.redrafting ? <span className="dots"><i /><i /><i /></span> : <SendIcon />}
+              </button>
             </div>
           </form>
         )}
@@ -301,37 +380,19 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
             <div className="sheet-head">
               <p className="eyebrow">Service sheet</p>
               <label className="service">
-                <select value={brief.service} onChange={(e) => correct('service', e.target.value, 'Service')} aria-label="Service: change to correct it">
+                <select value={brief.service} onChange={(e) => change('Service', (b) => { b.service = e.target.value })} aria-label="Service: change to correct it">
                   <option value="unknown">Service not set</option>
                   {SERVICES[stylist].map((o) => <option key={o} value={o}>{words(o)}</option>)}
                 </select>
               </label>
               {price && <p className="price"><b>{price.from ? 'from ' : ''}£{price.amount}</b>{price.note && <span className="muted"> · {price.note}</span>}</p>}
-              {saved && <p className="saved settle">{saved}</p>}
             </div>
 
             {SHEET[stylist].map((s) => (
               <div key={s.title} className="block">
                 <h3 className="eyebrow">{s.title}</h3>
-                {s.fields.map(select)}
-                {s.title === 'Look' && stylist === 'braider' && (
-                  <div className="line extras">
-                    <span className="k">Extras</span>
-                    <span className="v">
-                      {braiderTags.fields.extras.map((x) => {
-                        const on = (brief.look?.extras ?? []).includes(x)
-                        const was = (m.brief?.look?.extras ?? []).includes(x)
-                        const changed = !!m.corrected && on !== was
-                        return (
-                          <label key={x} className={changed ? (on ? 'tick added' : 'tick removed') : 'tick'}>
-                            <input type="checkbox" checked={on} onChange={() => toggleExtra(x, !on)} />
-                            {words(x)}
-                          </label>
-                        )
-                      })}
-                    </span>
-                  </div>
-                )}
+                {s.fields.map(field)}
+                {s.title === 'Look' && stylist === 'braider' && extras()}
               </div>
             ))}
 
@@ -358,17 +419,20 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
             <div className="block">
               <h3 className="eyebrow">Still to ask</h3>
               {(brief.missing ?? []).length ? <ul className="ask">{brief.missing.map((k: string) => <li key={k}>{ASK[k] ?? words(k)}</li>)}</ul> : <p className="muted">Nothing. Ready to quote or book.</p>}
-              <label className="line">
-                <span className="k">Next step</span>
-                <span className="v">
-                  <select value={brief.next_action} onChange={(e) => correct('next_action', e.target.value, 'Next step')} aria-label="Next step: change to correct it">
-                    {NEXT.map((o) => <option key={o} value={o}>{words(o)}</option>)}
-                  </select>
-                </span>
-              </label>
+              {field({ path: 'next_action', label: 'Next step', options: NEXT })}
             </div>
 
             <p className="drafted faint">Drafted by gpt-6-luna through Mubit{m.ms ? ` in ${(m.ms / 1000).toFixed(1)} s` : ''}, using {m.correctionsUsed} of your past fixes.{m.requestId && <> <span className="mono">{m.requestId}</span></>}</p>
+
+            {(pending || note) && (
+              <div className="toast settle" role="status">
+                {pending ? (
+                  <><span>{pending.labels.join(', ')} fixed</span><button type="button" onClick={undo}>Undo · {left}</button></>
+                ) : (
+                  <span>{note}</span>
+                )}
+              </div>
+            )}
           </>
         )}
       </section>
@@ -464,13 +528,21 @@ const CSS = `
 .line.fixed select { color: var(--good); }
 .line s { color: var(--bad); }
 .line.unsure { opacity: 0.6; }
-.extras { align-items: start; }
-.extras .v { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
-.tick { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); cursor: pointer; min-height: 32px; }
-.tick input { accent-color: var(--accent); width: 18px; height: 18px; }
-.tick:has(input:checked) { color: var(--ink); font-weight: 600; }
-.tick.added { color: var(--good); }
-.tick.removed { color: var(--bad); text-decoration: line-through; }
+.line .k { display: grid; gap: 2px; align-self: start; padding-top: 6px; }
+.src { font-size: 11.5px; color: var(--faint); line-height: 1.3; }
+.line.fixed .src { color: var(--good); font-weight: 600; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 6px 10px; font-size: 13.5px; color: var(--muted); min-height: 34px; transition: background 140ms var(--ease), color 140ms var(--ease), border-color 140ms var(--ease); }
+.seg button:hover { border-color: var(--faint); color: var(--ink); }
+.seg button.on { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
+.line.fixed .seg button.on { background: var(--good); border-color: var(--good); color: var(--bg); }
+.extras .v { gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 5px 9px; font-size: 13.5px; font-weight: 600; min-height: 32px; }
+.chip.added { border-color: var(--good); color: var(--good); }
+.extras select { border: 1px dashed var(--line); border-radius: 9px; padding: 5px 8px; font-size: 13.5px; color: var(--muted); background: transparent; }
+.reply-box.busy { opacity: 0.6; }
+.toast { position: sticky; bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--ink); color: var(--bg); border-radius: 14px; padding: 10px 12px 10px 16px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); }
+.toast button { border: 0; background: var(--bg); color: var(--ink); border-radius: 10px; padding: 7px 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ask { margin: 0 0 6px; padding-left: 18px; display: grid; gap: 4px; }
 .drafted { font-size: 12px; line-height: 1.5; margin-top: auto; overflow-wrap: anywhere; }
 /* Smaller iPad: the thread and the sheet stack in one scrolling column beside the list. */

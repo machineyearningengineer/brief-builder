@@ -38,7 +38,7 @@ const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 // What a client's phone may see of a message: their words, its status and the stylist's reply.
 const clientView = (m: RoomMessage): RoomMessage => ({
-  ...m, photoTags: null, brief: null, corrected: null, changed: [], requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
+  ...m, photoTags: null, brief: null, corrected: null, changed: [], requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null, redrafting: false,
 })
 
 export class StylistRoom extends DurableObject<Env> {
@@ -59,6 +59,7 @@ export class StylistRoom extends DurableObject<Env> {
     const cols = ctx.storage.sql.exec(`PRAGMA table_info(messages)`).toArray().map((c) => c.name)
     if (!cols.includes("images")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN images TEXT`)
     if (!cols.includes("baseline")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN baseline TEXT`)
+    if (!cols.includes("redrafting")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN redrafting INTEGER`)
     const row = ctx.storage.sql.exec(`SELECT value FROM meta WHERE key = 'stylist'`).toArray()[0]
     if (row) this.stylist = row.value as StylistKey
   }
@@ -144,10 +145,10 @@ export class StylistRoom extends DurableObject<Env> {
   private save(m: RoomMessage) {
     this.ctx.storage.sql.exec(
       `INSERT OR REPLACE INTO messages (id, client_id, created_at, received_at, text, photo, status, brief, corrected, changed,
-        reply, request_id, ms, corrections_used, guarded, images, baseline) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reply, request_id, ms, corrections_used, guarded, images, baseline, redrafting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       m.id, m.clientId, m.createdAt, m.receivedAt, m.text, JSON.stringify(m.photoTags), m.status, JSON.stringify(m.brief),
       JSON.stringify(m.corrected), JSON.stringify(m.changed), m.reply, m.requestId, m.ms, m.correctionsUsed, JSON.stringify(m.guarded),
-      JSON.stringify(m.images), JSON.stringify(m.baseline),
+      JSON.stringify(m.images), JSON.stringify(m.baseline), m.redrafting ? 1 : 0,
     )
     this.broadcast({ type: "message", message: m })
   }
@@ -202,6 +203,7 @@ export class StylistRoom extends DurableObject<Env> {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
       receivedAt: londonTimestamp(new Date()), text, photoTags: null, images, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
+      redrafting: false,
     }
     this.save(m)
     if (draft) this.ctx.waitUntil(this.draft(m))
@@ -269,8 +271,32 @@ export class StylistRoom extends DurableObject<Env> {
     for (const f of readerFixes(m.photoTags, m.brief, body.corrected, (PROFILES[this.stylist!].tags as any).trust_threshold)) {
       this.ctx.storage.sql.exec(`INSERT INTO reader_fixes VALUES (?, ?, ?, ?)`, f.field, f.said, f.now, Date.now())
     }
-    this.save({ ...m, corrected: body.corrected, changed })
+    this.save({ ...m, corrected: body.corrected, changed, redrafting: !m.reply })
+    if (!m.reply) this.ctx.waitUntil(this.redraft(m.id))
     return Response.json({ changed })
+  }
+
+  // After a fix, the same DM goes back through Mubit with the stylist's correction leading the
+  // worked examples, so the reply matches the corrected brief. Mubit records this answer: it's
+  // the corrected example the adapter trains on. Only the reply text is taken from it; the
+  // stylist's corrected fields stay exactly as they set them.
+  private async redraft(id: string) {
+    const m = this.message(id)
+    if (!m?.corrected) return
+    const { profile, tags } = PROFILES[this.stylist!]
+    const pool = this.correctionPool()
+    const own = pool.filter((c) => c.id === m.id)
+    const others = closestCorrections(m.text, pool.filter((c) => c.id !== m.id), 2)
+    const result = await callBrief({
+      key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low",
+      dm: { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null },
+      corrections: correctionsBlock([...own, ...others]),
+    }).catch(() => null)
+    const latest = this.message(id)
+    if (!latest?.corrected) return
+    const reply = (result?.brief as any)?.reply_draft
+    const corrected = typeof reply === "string" ? { ...latest.corrected, reply_draft: reply.replace(/\s*[—–]\s*/g, ", ") } : latest.corrected
+    this.save({ ...latest, corrected, redrafting: false })
   }
 
   private async reply(body: { id?: string; text?: string }) {
@@ -399,7 +425,7 @@ function toMessage(r: Record<string, any>): RoomMessage {
     id: r.id, clientId: r.client_id, createdAt: r.created_at, receivedAt: r.received_at, text: r.text,
     photoTags: JSON.parse(r.photo), status: r.status, brief: JSON.parse(r.brief), corrected: JSON.parse(r.corrected),
     changed: JSON.parse(r.changed ?? "[]"), reply: r.reply, requestId: r.request_id, ms: r.ms,
-    correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [], baseline: JSON.parse(r.baseline ?? "null"),
+    correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [], baseline: JSON.parse(r.baseline ?? "null"), redrafting: !!r.redrafting,
   }
 }
 

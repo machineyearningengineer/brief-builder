@@ -28,6 +28,8 @@ export type RoomMessage = {
   // The same DM answered by the plain model without this stylist's fixes, for comparison.
   // Never recorded by Mubit, so it can't train anything.
   baseline: { reply: string; nextAction: string; ms: number } | null
+  // True while the reply is being re-drafted from the stylist's corrected brief.
+  redrafting: boolean
 }
 
 export type RoomEvent = { type: "message"; message: RoomMessage } | { type: "reset" }
