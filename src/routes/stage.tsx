@@ -21,6 +21,10 @@ const RULE_SHORT: Record<StylistKey, Record<string, string>> = {
     '1': 'Boho vs curly ends', '3': 'Hair not included', '4': 'Budget is a ceiling', '5': 'Offer slots, never book',
     '6': 'Smedium', '7': 'Groups and kids', '9': 'Day words', '11': 'Photo vs text',
   },
+  nails: {
+    '17': 'Soak-off from elsewhere', '18': 'Bitten nails: photo first', '19': 'Infection: refer', '20': 'Ballerina is coffin',
+    '21': 'Infills within 3 weeks', '22': 'Pinterest art: photo first', '5': 'Offer slots, never book', '9': 'Day words',
+  },
   colourist: {
     '12': 'Patch test first', '13': 'Toner included', '14': 'Lived-in blonde', '15': 'Box dye needs a consult',
     '16': 'Dark to blonde', '5': 'Offer slots, never book', '9': 'Day words', '4': 'Budget is a ceiling',

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "note": "Nail tech tag list. reader_fields are the questions the photo reader answers; removal comes from the client's words only.",
+  "trust_threshold": 0.6,
+  "reader_fields": ["service", "length", "shape", "finish", "art"],
+  "fields": {
+    "service": ["biab", "gel_manicure", "gel_pedicure", "acrylic_full_set", "acrylic_infill", "gel_extensions", "classic_manicure", "soak_off_only", "other"],
+    "length": ["short", "medium", "long", "xl"],
+    "shape": ["square", "squoval", "round", "oval", "almond", "coffin", "stiletto"],
+    "finish": ["plain", "french", "chrome", "ombre", "cat_eye"],
+    "art": ["accent_nails", "full_art", "gems", "charms"],
+    "removal": ["none", "own_work", "other_salon"]
+  }
+}

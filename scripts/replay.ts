@@ -15,7 +15,7 @@ const flag = (name: string, fallback: string) => {
   const i = args.indexOf(`--${name}`)
   return i >= 0 ? args[i + 1] : fallback
 }
-const stylist = args[0] as "braider" | "colourist"
+const stylist = args[0] as "braider" | "colourist" | "nails"
 const file = args[1] ?? "train.jsonl"
 const effort = flag("effort", "low") as "none" | "low"
 const concurrency = Number(flag("concurrency", "4"))

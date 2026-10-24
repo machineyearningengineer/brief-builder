@@ -1,5 +1,7 @@
 // Sends hand-written, unlabelled DMs through Mubit as training input. Mubit learns from the
 // model's answers, so these need no labels; they add variety the generated set lacks.
+// A line with " || " is one client's conversation: each turn is sent with the turns before it
+// (and the model's brief for each) as history, the way the room sends a follow-up.
 // Usage: node scripts/send-extra.ts <stylist> [--file extra-train.txt] [--effort medium] [--concurrency 3]
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -10,7 +12,7 @@ import { callBrief } from "../src/server/brief-call.ts"
 const ROOT = join(import.meta.dirname, "..")
 const args = process.argv.slice(2)
 const flag = (name: string, fallback: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : fallback)
-const stylist = args[0] as "braider" | "colourist"
+const stylist = args[0] as "braider" | "colourist" | "nails"
 const effort = flag("effort", "medium") as "low" | "medium"
 const concurrency = Number(flag("concurrency", "3"))
 const file = flag("file", "extra-train.txt")
@@ -36,11 +38,18 @@ let valid = 0
 async function worker() {
   while (next < texts.length) {
     const i = next++
-    const r = await callBrief({ key: env.MUBIT_API_KEY, profile, tags, effort, record: "full", dm: { received_at: receivedAt(i), text: texts[i], photo: null } })
-    if (r.status === 200) ok++
-    if (isValid(r.brief)) valid++
-    console.log(`${String(i + 1).padStart(3)} ${r.status} ${String(r.ms).padStart(6)} ms ${isValid(r.brief) ? "valid" : "INVALID"}  ${texts[i].slice(0, 60)}`)
+    const turns = texts[i].split(" || ")
+    const history: { dm: { received_at: string; text: string; photo: null }; brief: Record<string, unknown> }[] = []
+    for (const [t, text] of turns.entries()) {
+      const dm = { received_at: receivedAt(i).replace(/:00\+/, `:${String(t * 4).padStart(2, "0")}+`), text, photo: null }
+      const r = await callBrief({ key: env.MUBIT_API_KEY, profile, tags, effort, record: "full", dm, history: [...history] })
+      if (r.status === 200) ok++
+      if (isValid(r.brief)) valid++
+      console.log(`${String(i + 1).padStart(3)}.${t + 1} ${r.status} ${String(r.ms).padStart(6)} ms ${isValid(r.brief) ? "valid" : "INVALID"}  ${text.slice(0, 60)}`)
+      if (!isValid(r.brief)) break
+      history.push({ dm, brief: r.brief as Record<string, unknown> })
+    }
   }
 }
 await Promise.all(Array.from({ length: concurrency }, worker))
-console.log(`\n${stylist}: ${ok}/${texts.length} answered, ${valid} schema-valid, effort ${effort}`)
+console.log(`\n${stylist}: ${ok}/${texts.reduce((n, l) => n + l.split(" || ").length, 0)} calls answered, ${valid} schema-valid, effort ${effort}`)

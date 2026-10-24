@@ -5,6 +5,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import braiderTags from '../../data/braider/tags.json'
 import colouristTags from '../../data/colourist/tags.json'
+import nailsTags from '../../data/nails/tags.json'
 import { BackIcon, SendIcon, SunMoonIcon } from '../client/icons.tsx'
 import { imageUrlForStylist, post, stylistToken, useRoom } from '../client/room.ts'
 import { estimate } from '../shared/pricing.ts'
@@ -46,8 +47,24 @@ const SHEET: Record<StylistKey, Section[]> = {
       { path: 'patch_test', label: 'Patch test', options: ['needed', 'done'] },
     ] },
   ],
+  nails: [
+    { title: 'Look', fields: [
+      { path: 'look.length', label: 'Length', options: nailsTags.fields.length },
+      { path: 'look.shape', label: 'Shape', options: nailsTags.fields.shape },
+      { path: 'look.finish', label: 'Finish', options: nailsTags.fields.finish },
+    ] },
+    { title: 'Nails now', fields: [
+      { path: 'removal', label: 'On now', options: nailsTags.fields.removal },
+    ] },
+  ],
 }
-const SERVICES: Record<StylistKey, string[]> = { braider: braiderTags.fields.service, colourist: colouristTags.fields.service }
+// The look's list field (braids extras, nail art), shown as chips with "Add…".
+const EXTRAS: Record<StylistKey, { key: string; label: string; options: string[] } | null> = {
+  braider: { key: 'extras', label: 'Extras', options: braiderTags.fields.extras },
+  colourist: null,
+  nails: { key: 'art', label: 'Art', options: nailsTags.fields.art },
+}
+const SERVICES: Record<StylistKey, string[]> = { braider: braiderTags.fields.service, colourist: colouristTags.fields.service, nails: nailsTags.fields.service }
 const NEXT = ['ask', 'quote', 'offer_slots', 'decline', 'refer']
 const ASK: Record<string, string> = {
   service: 'Which service they want', length: 'How long', size: 'What size', shade: 'Which shade', date: 'Which day',
@@ -63,6 +80,9 @@ const SPOKEN: Record<string, string> = {
   box_braids: "box braids", french_curls: "French curls", locs_retwist: "loc retwist", loc_install: "starter locs", silk_press: "silk press",
   sew_in: "sew-in", wig_install: "wig install", lived_in_blonde: "lived-in blonde", virgin_dark: "never dyed, dark", virgin_light: "never dyed, light",
   box_dye: "box dye", previously_lightened: "lightened before", root_touch_up: "root touch-up", full_colour: "full colour", colour_correction: "colour correction",
+  biab: "BIAB", gel_manicure: "gel manicure", gel_pedicure: "gel pedicure", acrylic_full_set: "acrylic full set", acrylic_infill: "acrylic infill",
+  gel_extensions: "gel extensions", classic_manicure: "classic manicure", soak_off_only: "soak-off only", xl: "extra long", french: "French tip",
+  cat_eye: "cat eye", accent_nails: "accent nails", full_art: "art on every nail", none: "nothing on", own_work: "your own work", other_salon: "another salon's",
   heart_design: "heart design", triangle_parts: "triangle parts", fulani_pattern: "Fulani pattern", side_part: "side part", edges_laid: "edges laid",
 }
 const words = (v: unknown) => {
@@ -322,25 +342,27 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
   }
 
   const extras = () => {
-    const on: string[] = brief?.look?.extras ?? []
-    const was: string[] = m.brief?.look?.extras ?? []
-    const removed = was.filter((x) => !on.includes(x))
-    const rest = braiderTags.fields.extras.filter((x) => !on.includes(x))
-    const fromPhoto = m.brief?.evidence?.['look.extras'] === '[photo]'
+    const x = EXTRAS[stylist]
+    if (!x) return null
+    const on: string[] = brief?.look?.[x.key] ?? []
+    const was: string[] = m.brief?.look?.[x.key] ?? []
+    const removed = was.filter((v) => !on.includes(v))
+    const rest = x.options.filter((v) => !on.includes(v))
+    const fromPhoto = m.brief?.evidence?.[`look.${x.key}`] === '[photo]'
     return (
       <div className="line extras">
-        <span className="k">Extras<small className="src">{removed.length || on.some((x) => !was.includes(x)) ? 'Your fix' : fromPhoto ? 'From photo' : ''}</small></span>
+        <span className="k">{x.label}<small className="src">{removed.length || on.some((v) => !was.includes(v)) ? 'Your fix' : fromPhoto ? 'From photo' : ''}</small></span>
         <span className="v">
-          {on.map((x) => (
-            <button key={x} type="button" className={was.includes(x) ? 'chip' : 'chip added'} onClick={() => change('Extras', (b) => { b.look.extras = on.filter((y) => y !== x) })} aria-label={`Remove ${words(x)}`}>
-              {words(x)} <span aria-hidden="true">×</span>
+          {on.map((v) => (
+            <button key={v} type="button" className={was.includes(v) ? 'chip' : 'chip added'} onClick={() => change(x.label, (b) => { b.look[x.key] = on.filter((y) => y !== v) })} aria-label={`Remove ${words(v)}`}>
+              {words(v)} <span aria-hidden="true">×</span>
             </button>
           ))}
-          {removed.map((x) => <s key={x} className="faint">{words(x)}</s>)}
+          {removed.map((v) => <s key={v} className="faint">{words(v)}</s>)}
           {rest.length > 0 && (
-            <select value="" onChange={(e) => { const x = e.target.value; if (x) change('Extras', (b) => { b.look.extras = [...on, x] }) }} aria-label="Add an extra">
+            <select value="" onChange={(e) => { const v = e.target.value; if (v) change(x.label, (b) => { b.look[x.key] = [...on, v] }) }} aria-label={`Add ${x.label.toLowerCase()}`}>
               <option value="">Add…</option>
-              {rest.map((x) => <option key={x} value={x}>{words(x)}</option>)}
+              {rest.map((v) => <option key={v} value={v}>{words(v)}</option>)}
             </select>
           )}
         </span>
@@ -407,7 +429,7 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
               <div key={s.title} className="block">
                 <h3 className="eyebrow">{s.title}</h3>
                 {s.fields.map(field)}
-                {s.title === 'Look' && stylist === 'braider' && extras()}
+                {s.title === 'Look' && extras()}
               </div>
             ))}
 

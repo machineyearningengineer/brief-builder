@@ -5,7 +5,7 @@ import { basename, join } from "node:path"
 
 const ROOT = join(import.meta.dirname, "..")
 const runPath = process.argv[2]
-const [, stylist, split] = basename(runPath).match(/Z-(braider|colourist)-(train|heldout|trend)-/) ?? []
+const [, stylist, split] = basename(runPath).match(/Z-(braider|colourist|nails)-(train|heldout|trend)-/) ?? []
 const lines = (p: string) => readFileSync(p, "utf8").trim().split("\n").map((l) => JSON.parse(l))
 const run = lines(runPath)
 const data = new Map(lines(join(ROOT, "data", stylist, `${split}.jsonl`)).map((d) => [d.id, d]))

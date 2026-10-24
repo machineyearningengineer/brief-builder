@@ -10,6 +10,9 @@ import braiderCorrections from "../../data/braider/corrections.jsonl?raw"
 import colouristProfile from "../../data/colourist/profile.json"
 import colouristTags from "../../data/colourist/tags.json"
 import colouristCorrections from "../../data/colourist/corrections.jsonl?raw"
+import nailsProfile from "../../data/nails/profile.json"
+import nailsTags from "../../data/nails/tags.json"
+import nailsCorrections from "../../data/nails/corrections.jsonl?raw"
 import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
 import { closestCorrections, correctionsBlock, type Correction } from "./corrections.ts"
@@ -19,6 +22,7 @@ import { readPhotos, type ReaderFix } from "./photo-reader.ts"
 const PROFILES = {
   braider: { profile: braiderProfile, tags: braiderTags, seedCorrections: braiderCorrections },
   colourist: { profile: colouristProfile, tags: colouristTags, seedCorrections: colouristCorrections },
+  nails: { profile: nailsProfile, tags: nailsTags, seedCorrections: nailsCorrections },
 } as const
 
 const parseJsonl = (s: string): Correction[] => s.trim() ? s.trim().split("\n").map((l) => JSON.parse(l)) : []

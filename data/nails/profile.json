@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "id": "nails",
+  "persona": "Nail tech working from a home studio in Hackney, East London. BIAB, gel, acrylic and gel extensions, nail art and gel pedicures. Doesn't do under-12s.",
+  "currency": "GBP",
+  "prices": {
+    "note": "Extension prices (acrylic full set, gel extensions, acrylic infill) start at short length. Finish and art are added on top of any service. Removing my own work is free.",
+    "base": {"biab": 38, "gel_manicure": 30, "acrylic_full_set": 40, "gel_extensions": 45, "acrylic_infill": 30},
+    "length": {"short": 0, "medium": 5, "long": 10, "xl": 15},
+    "finish": {"plain": 0, "french": 5, "chrome": 8, "ombre": 8, "cat_eye": 6},
+    "art": {"accent_nails": 5, "full_art": 15, "gems": 5, "charms": 8},
+    "soak_off_other_salon": 10,
+    "fixed": {"gel_pedicure": 35, "classic_manicure": 22, "soak_off_only": 15}
+  },
+  "house_rules": [
+    {"id": 4, "rule": "\"Under £X\" is a ceiling, never a quote. Quote the real price."},
+    {"id": 5, "rule": "Never confirm a booking from a DM: offer specific slots instead."},
+    {"id": 7, "rule": "\"Me and my bestie\" sets people; under-12s are referred elsewhere."},
+    {"id": 9, "rule": "Day words resolve against the message's received time."},
+    {"id": 10, "rule": "The reply asks at most two questions, most important first."},
+    {"id": 11, "rule": "Photo tags under 0.6 confidence aren't used. Text beats photo; a clash on length or shape becomes a question."},
+    {"id": 17, "rule": "Gel or acrylic from another salon needs a £10 soak-off; removing my own work is free. If it's unclear whether they have product on, ask."},
+    {"id": 18, "rule": "Bitten or very short nails: ask for a photo of their nails now before booking extensions."},
+    {"id": 19, "rule": "Green or yellow patches, lifting with discolouration, or a suspected infection: don't book. Refer them to a pharmacist or GP, kindly."},
+    {"id": 20, "rule": "\"Ballerina\" means coffin shape."},
+    {"id": 21, "rule": "Infills are only within 3 weeks of the set; after that it's a new full set."},
+    {"id": 22, "rule": "A design from Pinterest or TikTok needs a photo of it before art is quoted."}
+  ]
+}

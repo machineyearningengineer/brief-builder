@@ -10,6 +10,7 @@ export type ReaderTag = { field: string; tag: string; confidence: number }
 
 const SHAPES: Record<string, string> = {
   braider: `{"service", "look": {"length", "size", "ends", "colour", "extras": []}, "hair": {"texture", "current"}, "hair_included", "budget_max_gbp", "when": {"dates": [], "window"}, "area", "people", "missing": [], "next_action", "reply_draft", "evidence": {}}`,
+  nails: `{"service", "look": {"length", "shape", "finish", "art": []}, "removal", "budget_max_gbp", "when": {"dates": [], "window"}, "area", "people", "missing": [], "next_action", "reply_draft", "evidence": {}}`,
   colourist: `{"service", "look": {"length", "shade", "history"}, "hair": {"texture", "current"}, "patch_test", "budget_max_gbp", "when": {"dates": [], "window"}, "area", "people", "missing": [], "next_action", "reply_draft", "evidence": {}}`,
 }
 

@@ -5,7 +5,7 @@ import { Schema } from "effect"
 
 const Unknown = "unknown" as const
 
-export const StylistId = Schema.Literals(["braider", "colourist"])
+export const StylistId = Schema.Literals(["braider", "colourist", "nails"])
 export type StylistId = typeof StylistId.Type
 
 export const NextAction = Schema.Literals(["ask", "quote", "offer_slots", "decline", "refer"])
@@ -13,7 +13,7 @@ export type NextAction = typeof NextAction.Type
 
 export const MissingKey = Schema.Literals([
   "service", "length", "size", "shade", "date", "length_photo", "consultation",
-  "confirm_length", "confirm_ends", "confirm_shade",
+  "confirm_length", "confirm_ends", "confirm_shade", "shape", "nail_photo", "design_photo",
 ])
 
 export const HairTexture = Schema.Literals(["1", "2", "3a", "3b", "3c", "4a", "4b", "4c", "relaxed", Unknown])
@@ -40,8 +40,8 @@ export const ColouristLook = Schema.Struct({
   history: Schema.Literals(["virgin_dark", "virgin_light", "box_dye", "previously_lightened", Unknown]),
 })
 
+const hair = Schema.Struct({ texture: HairTexture, current: HairCurrent })
 const common = {
-  hair: Schema.Struct({ texture: HairTexture, current: HairCurrent }),
   budget_max_gbp: Schema.NullOr(Schema.Number),
   when: Schema.Struct({ dates: Schema.Array(Schema.String), window: Schema.NullOr(Schema.String) }),
   area: Schema.NullOr(Schema.String),
@@ -57,6 +57,7 @@ export const BraiderBrief = Schema.Struct({
   service: BraiderService,
   look: BraiderLook,
   hair_included: Schema.Literals(["yes", "no", Unknown]),
+  hair,
   ...common,
 })
 export type BraiderBrief = typeof BraiderBrief.Type
@@ -65,11 +66,29 @@ export const ColouristBrief = Schema.Struct({
   service: ColouristService,
   look: ColouristLook,
   patch_test: Schema.Literals(["needed", "done"]),
+  hair,
   ...common,
 })
 export type ColouristBrief = typeof ColouristBrief.Type
 
-export const briefSchemaFor = { braider: BraiderBrief, colourist: ColouristBrief } as const
+export const NailsService = Schema.Literals([
+  "biab", "gel_manicure", "gel_pedicure", "acrylic_full_set", "acrylic_infill", "gel_extensions", "classic_manicure", "soak_off_only", "other", Unknown,
+])
+export const NailsLook = Schema.Struct({
+  length: Schema.Literals(["short", "medium", "long", "xl", Unknown]),
+  shape: Schema.Literals(["square", "squoval", "round", "oval", "almond", "coffin", "stiletto", Unknown]),
+  finish: Schema.Literals(["plain", "french", "chrome", "ombre", "cat_eye", Unknown]),
+  art: Schema.Array(Schema.Literals(["accent_nails", "full_art", "gems", "charms"])),
+})
+export const NailsBrief = Schema.Struct({
+  service: NailsService,
+  look: NailsLook,
+  removal: Schema.Literals(["none", "own_work", "other_salon", Unknown]),
+  ...common,
+})
+export type NailsBrief = typeof NailsBrief.Type
+
+export const briefSchemaFor = { braider: BraiderBrief, colourist: ColouristBrief, nails: NailsBrief } as const
 
 // What the photo reader returns, whichever vendor sits behind it.
 export const ReaderTag = Schema.Struct({ field: Schema.String, tag: Schema.String, confidence: Schema.Number })
@@ -94,5 +113,6 @@ const row = {
 export const DatasetRow = Schema.Union([
   Schema.Struct({ stylist: Schema.Literal("braider"), label: BraiderBrief, ...row }),
   Schema.Struct({ stylist: Schema.Literal("colourist"), label: ColouristBrief, ...row }),
+  Schema.Struct({ stylist: Schema.Literal("nails"), label: NailsBrief, ...row }),
 ])
 export type DatasetRow = typeof DatasetRow.Type

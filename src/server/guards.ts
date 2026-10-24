@@ -1,7 +1,7 @@
 // Checks a model brief before anyone sees it. A field whose evidence isn't really in the DM
 // (or isn't a trusted photo tag) becomes "unknown": nothing invented reaches the screen.
 
-const scalarPaths = ["service", "look.length", "look.size", "look.ends", "look.colour", "look.shade", "look.history", "hair.texture", "hair.current", "hair_included"]
+const scalarPaths = ["service", "look.length", "look.size", "look.ends", "look.colour", "look.shade", "look.history", "hair.texture", "hair.current", "hair_included", "look.shape", "look.finish", "removal"]
 
 const getPath = (o: any, path: string) => path.split(".").reduce((v, k) => v?.[k], o)
 const setPath = (o: any, path: string, value: unknown) => {
@@ -45,7 +45,13 @@ export function applyTrustedPhotoTags(brief: Record<string, any>, tags: { field:
 
 export function guardEvidence(brief: Record<string, any>, text: string, trustedPhotoFields: Set<string>): string[] {
   const cleared: string[] = []
-  const evidence: Record<string, string> = brief.evidence ?? {}
+  // Model output: a quote must be a string. A list of quotes keeps its first; anything else goes.
+  const raw = brief.evidence && typeof brief.evidence === "object" ? brief.evidence : {}
+  const evidence: Record<string, string> = Object.fromEntries(Object.entries(raw).flatMap(([k, v]) => {
+    const q = Array.isArray(v) ? v.find((x) => typeof x === "string") : v
+    return typeof q === "string" ? [[k, q]] : []
+  }))
+  brief.evidence = evidence
   const haystack = text.toLowerCase()
   for (const path of scalarPaths) {
     const value = getPath(brief, path)

@@ -2,6 +2,7 @@
 // house rules that affect them, written the way a stylist would say them.
 import braiderProfile from '../../data/braider/profile.json'
 import colouristProfile from '../../data/colourist/profile.json'
+import nailsProfile from '../../data/nails/profile.json'
 import type { StylistKey } from './stylists.ts'
 
 export type MenuSection = { title: string; items: { name: string; price: string; note?: string }[] }
@@ -9,6 +10,7 @@ export type MenuSection = { title: string; items: { name: string; price: string;
 const from = (n: number) => `from £${n}`
 const b = braiderProfile.prices
 const c = colouristProfile.prices
+const n = nailsProfile.prices
 
 export const MENU: Record<StylistKey, MenuSection[]> = {
   braider: [
@@ -59,6 +61,34 @@ export const MENU: Record<StylistKey, MenuSection[]> = {
       ],
     },
   ],
+  nails: [
+    {
+      title: 'Hands',
+      items: [
+        { name: 'BIAB', price: `£${n.base.biab}`, note: 'On your natural nails' },
+        { name: 'Gel manicure', price: `£${n.base.gel_manicure}` },
+        { name: 'Classic manicure', price: `£${n.fixed.classic_manicure}` },
+      ],
+    },
+    {
+      title: 'Extensions',
+      items: [
+        { name: 'Acrylic full set', price: from(n.base.acrylic_full_set), note: `Long +£${n.length.long}` },
+        { name: 'Gel extensions', price: from(n.base.gel_extensions) },
+        { name: 'Acrylic infill', price: from(n.base.acrylic_infill), note: 'Within 3 weeks of your set' },
+      ],
+    },
+    {
+      title: 'Feet and finishes',
+      items: [
+        { name: 'Gel pedicure', price: `£${n.fixed.gel_pedicure}` },
+        { name: 'French tip', price: `+£${n.finish.french}` },
+        { name: 'Chrome', price: `+£${n.finish.chrome}` },
+        { name: 'Nail art', price: `from +£${n.art.accent_nails}`, note: `Every nail +£${n.art.full_art}` },
+        { name: "Soak-off of another salon's work", price: `+£${n.soak_off_other_salon}` },
+      ],
+    },
+  ],
 }
 
 // Photos of the stylist's own work, served from /public/work.
@@ -69,6 +99,7 @@ export const WORK: Record<StylistKey, { src: string; alt: string }[]> = {
     { src: '/work/soft-locs.webp', alt: 'Soft locs' },
   ],
   colourist: [{ src: '/work/curls.webp', alt: 'Copper colour on 3c curls' }],
+  nails: [],
 }
 
 export const POLICIES: Record<StylistKey, string[]> = {
@@ -83,5 +114,11 @@ export const POLICIES: Record<StylistKey, string[]> = {
     'Box-dyed or bleached hair starts with a free 15-minute consultation.',
     'Going from dark to blonde can take two sessions.',
     "I don't colour under-16s.",
+  ],
+  nails: [
+    "Got gel or acrylic on from somewhere else? Soak-off is £10. Taking off my own work is free.",
+    "Infills are within 3 weeks of your set. After that it's a new full set.",
+    'Bitten nails? Send me a photo of them first.',
+    "I don't do under-12s.",
   ],
 }
