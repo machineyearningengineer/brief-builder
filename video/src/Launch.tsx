@@ -258,16 +258,16 @@ export function RealApp() {
 }
 
 // 9. Close.
-function Close() {
+export function Close() {
   // Signs off in three beats, in time with the narration: the DM, the outcome, the name.
   return (
     <Scene frames={SCENES.close}>
       <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", textAlign: "center" }}>
         <div>
-          <Rise at={44}><div style={{ fontSize: 56, color: t.muted, fontStyle: "italic" }}>“can u do these?”</div></Rise>
-          <Rise at={102}><div style={{ fontFamily: t.display, fontWeight: 750, fontSize: 190, letterSpacing: "-0.04em", lineHeight: 1, color: t.accent, marginTop: 18 }}>Booked.</div></Rise>
-          <Rise at={140} style={{ marginTop: 56 }}><div style={{ fontFamily: t.display, fontWeight: 700, fontSize: 48, letterSpacing: "-0.02em" }}>Brief Builder</div></Rise>
-          <Rise at={156} style={{ marginTop: 12, fontSize: 24, color: t.faint }}>brief-builder.buy-ea2.workers.dev · every model call through Mubit</Rise>
+          <Rise at={18}><div style={{ fontSize: 56, color: t.muted, fontStyle: "italic" }}>“can u do these?”</div></Rise>
+          <Rise at={74}><div style={{ fontFamily: t.display, fontWeight: 750, fontSize: 190, letterSpacing: "-0.04em", lineHeight: 1, color: t.accent, marginTop: 18 }}>Booked.</div></Rise>
+          <Rise at={108} style={{ marginTop: 56 }}><div style={{ fontFamily: t.display, fontWeight: 700, fontSize: 48, letterSpacing: "-0.02em" }}>Brief Builder</div></Rise>
+          <Rise at={126} style={{ marginTop: 12, fontSize: 24, color: t.faint }}>brief-builder.buy-ea2.workers.dev · every model call through Mubit</Rise>
         </div>
       </div>
     </Scene>

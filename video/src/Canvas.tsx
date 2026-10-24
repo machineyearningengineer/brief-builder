@@ -19,10 +19,17 @@ const CAM: [number, number, number, number][] = [
   [525, 875, 420, 0.95], [690, 875, 420, 0.95], [760, 1100, 960, 0.6], [800, 1100, 960, 0.6],
   [850, 880, 1380, 1.0], [940, 880, 1380, 1.0], [990, 2100, 1360, 1.3], [1100, 2100, 1360, 1.3], [1150, 1825, 1380, 0.98], [1290, 1825, 1380, 0.98],
 ]
+// The same beats framed for a phone screen (1080×1920): one card at a time, closer in.
+const CAM_V: [number, number, number, number][] = [
+  [0, 235, 450, 1.75], [100, 235, 450, 1.75], [150, 880, 420, 1.55], [230, 880, 420, 1.55],
+  [270, 1518, 300, 1.55], [340, 1518, 300, 1.55], [385, 880, 320, 1.6], [450, 880, 330, 1.6],
+  [500, 1518, 300, 1.45], [560, 1518, 300, 1.45], [610, 1153, 420, 0.87], [700, 1153, 420, 0.87],
+  [760, 1153, 900, 0.6], [800, 1153, 900, 0.6], [850, 1153, 1380, 0.87], [940, 1153, 1380, 0.87],
+]
 const ease = Easing.bezier(0.65, 0, 0.35, 1)
-function camera(f: number) {
-  const frames = CAM.map((k) => k[0])
-  const at = (i: number) => interpolate(f, frames, CAM.map((k) => k[i]), { easing: ease, extrapolateLeft: "clamp", extrapolateRight: "clamp" })
+function camera(f: number, keys = CAM) {
+  const frames = keys.map((k) => k[0])
+  const at = (i: number) => interpolate(f, frames, keys.map((k) => k[i]), { easing: ease, extrapolateLeft: "clamp", extrapolateRight: "clamp" })
   return { x: at(1), y: at(2), s: at(3) }
 }
 
@@ -31,22 +38,25 @@ const SHEET = { x: 560, y: 60, w: 640 }
 const rowY = (i: number) => SHEET.y + 96 + i * ROW
 const TAP = 410
 
-function Overlay({ from, to, children }: { from: number; to: number; children: React.ReactNode }) {
+function Overlay({ from, to, children, vertical }: { from: number; to: number; children: React.ReactNode; vertical?: boolean }) {
   const f = useCurrentFrame()
   const o = interpolate(f, [from, from + 14, to - 12, to], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
+  const place: React.CSSProperties = vertical ? { left: 64, right: 64, bottom: 190, textAlign: "center" } : { left: 96, bottom: 84 }
   return (
-    <div style={{ position: "absolute", left: 96, bottom: 84, opacity: o, transform: `translateY(${(1 - o) * 18}px)` }}>
-      <div style={{ display: "inline-block", padding: "18px 28px", borderRadius: 22, background: "oklch(13.5% 0.009 330 / 0.82)", backdropFilter: "blur(14px)", fontFamily: t.display, fontWeight: 700, fontSize: 54, letterSpacing: "-0.02em" }}>{children}</div>
+    <div style={{ position: "absolute", ...place, opacity: o, transform: `translateY(${(1 - o) * 18}px)` }}>
+      <div style={{ display: "inline-block", padding: "18px 28px", borderRadius: 22, background: "oklch(13.5% 0.009 330 / 0.82)", backdropFilter: "blur(14px)", fontFamily: t.display, fontWeight: 700, fontSize: vertical ? 60 : 54, lineHeight: 1.12, letterSpacing: "-0.02em", textWrap: "balance" }}>{children}</div>
     </div>
   )
 }
 
-export function InboxCanvas() {
+// vertical frames the same canvas for a phone screen, for stories.
+export function InboxCanvas({ vertical = false }: { vertical?: boolean }) {
   const f = useCurrentFrame()
-  const cam = camera(f)
+  const cam = camera(f, vertical ? CAM_V : CAM)
+  const centre = vertical ? "540px, 900px" : "960px, 540px"
   return (
     <div style={{ position: "absolute", inset: 0, background: t.bg, color: t.ink, fontFamily: t.sans, overflow: "hidden" }}>
-      <div style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: `translate(960px, 540px) scale(${cam.s}) translate(${-cam.x}px, ${-cam.y}px)` }}>
+      <div style={{ position: "absolute", left: 0, top: 0, transformOrigin: "0 0", transform: `translate(${centre}) scale(${cam.s}) translate(${-cam.x}px, ${-cam.y}px)` }}>
         <ClientPhone />
         <HeroSheet />
         <ReplyCard x={1290} y={60} label="Draft reply" first={capture.hero.firstReply} second={capture.hero.fixedReply} typeAt={282} redraftFrom={TAP + 70} redraftTo={TAP + 130} />
@@ -54,14 +64,14 @@ export function InboxCanvas() {
         <NextClient />
         <VoiceCard />
       </div>
-      <Overlay from={8} to={140}>A photo and a few words.</Overlay>
-      <Overlay from={150} to={262}>The sheet fills itself, from her price list.</Overlay>
-      <Overlay from={270} to={372}>The reply drafts itself.</Overlay>
-      <Overlay from={380} to={515}>The reader said {say(capture.hero.firstSize).toLowerCase()}. She can see it’s {say(capture.hero.fixedSize).toLowerCase()}.</Overlay>
-      <Overlay from={525} to={700}>One tap. The price and the reply follow.</Overlay>
-      <Overlay from={770} to={950}>The next client gets it right first time.</Overlay>
-      <Overlay from={975} to={1105}>She rewrote one draft last week.</Overlay>
-      <Overlay from={1150} to={1290}>Now every draft sounds like her.</Overlay>
+      <Overlay vertical={vertical} from={8} to={140}>A photo and a few words.</Overlay>
+      <Overlay vertical={vertical} from={150} to={262}>The sheet fills itself, from her price list.</Overlay>
+      <Overlay vertical={vertical} from={270} to={372}>The reply drafts itself.</Overlay>
+      <Overlay vertical={vertical} from={380} to={515}>The reader said {say(capture.hero.firstSize).toLowerCase()}. She can see it’s {say(capture.hero.fixedSize).toLowerCase()}.</Overlay>
+      <Overlay vertical={vertical} from={525} to={700}>One tap. The price and the reply follow.</Overlay>
+      <Overlay vertical={vertical} from={770} to={950}>The next client gets it right first time.</Overlay>
+      <Overlay vertical={vertical} from={975} to={1105}>She rewrote one draft last week.</Overlay>
+      <Overlay vertical={vertical} from={1150} to={1290}>Now every draft sounds like her.</Overlay>
     </div>
   )
 }
