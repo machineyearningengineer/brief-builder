@@ -50,11 +50,31 @@ flowchart LR
 
 Locked test DMs, never sent to Mubit for training. Fully right means every field of the brief matches.
 
-| Stylist | Test DMs | Plain model | With her fixes |
-| --- | --- | --- | --- |
-| Amara Braids, braider | 60 | 28% | **52%** |
-| Lived-in Colour, colourist | 20 | 0% | **35%** |
-| Gloss by Jade, nail tech | 24 | 29% | **58%** |
+| Stylist | Test DMs | Plain model | With her fixes | + her rules in code |
+| --- | --- | --- | --- | --- |
+| Amara Braids, braider | 60 | 30% | 53% | **72%** |
+| Lived-in Colour, colourist | 20 | 15% | 60% | **85%** |
+| Gloss by Jade, nail tech | 24 | 25% | 50% | **92%** |
+
+Her rules in code decide the next step, what’s missing, dates from day words and time windows
+(`src/shared/decide.ts`). They were checked against the training labels first (198 of 200 next steps,
+every resolved date), then scored once on the locked sets.
+
+## How the code is organised
+
+| Where | What it owns |
+| --- | --- |
+| `src/server/room.ts` | One Durable Object per stylist: DMs, photos, drafts, fixes, threads, live updates |
+| `src/server/brief-call.ts`, `photo-reader.ts` | The two model calls, both through Mubit |
+| `src/server/brief-prompt.ts` | Her instructions, built only from her profile, so each stylist is one Mubit task |
+| `src/server/guards.ts` | Every field needs a source; settled fields carry through a conversation |
+| `src/server/corrections.ts` | Her closest fixes and her voice, as worked examples |
+| `src/shared/decide.ts` | What code decides exactly: next step, missing info, dates, time windows |
+| `src/shared/pricing.ts` | Prices and the closest yes, from her price list |
+| `src/shared/brief.ts` | The brief schema (Effect Schema), shared by server, screens and scoring |
+| `src/routes/` | The client chat (`s.$stylist`), her inbox (`inbox.$stylist`), the stage |
+| `data/<stylist>/` | Her profile, tag list, seed fixes, voice examples, training DMs and locked test |
+| `scripts/` | Replay and score the locked tests, send training batches, check the data |
 
 ## Run it
 

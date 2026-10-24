@@ -111,11 +111,16 @@ function Typing({ from, to }: { from: number; to: number }) {
 // 6. Same model, with and without her fixes, on DMs it never trained on.
 function Learn() {
   const b = scores.braider
+  const final = b.rules ?? b.corrected
   const bars = [
-    { label: "Briefs fully right", a: b.base.fullyRight, z: b.corrected.fullyRight },
-    { label: "Right next step", a: b.base.nextAction, z: b.corrected.nextAction },
-    { label: "Offers times instead of booking", a: b.base.nextActionByRule["5"], z: b.corrected.nextActionByRule["5"] },
+    { label: "Briefs fully right", a: b.base.fullyRight, m: b.corrected.fullyRight, z: final.fullyRight },
+    { label: "Right next step", a: b.base.nextAction, m: b.corrected.nextAction, z: final.nextAction },
+    { label: "Offers times instead of booking", a: b.base.nextActionByRule["5"], m: b.corrected.nextActionByRule["5"], z: final.nextActionByRule["5"] },
   ]
+  const others = (["colourist", "nails"] as const).map((k) => {
+    const s = scores[k]
+    return `${k === "nails" ? "Nail tech" : "Colourist"} ${s.base.fullyRight}% → ${(s.rules ?? s.corrected).fullyRight}%`
+  })
   return (
     <Scene frames={SCENES.learn}>
       <Rise at={0} style={{ position: "absolute", left: 120, top: 70 }}><Eyebrow>A DM it has never seen</Eyebrow></Rise>
@@ -123,33 +128,33 @@ function Learn() {
         <div style={{ fontSize: 34, lineHeight: 1.35 }}>“{sideBySide.dm}”</div>
       </Rise>
       <div style={{ position: "absolute", left: 120, top: 250, width: 1680, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 36 }}>
-        <Rise at={40}><Card style={{ padding: 32 }}><Eyebrow>Without her fixes</Eyebrow><p style={{ fontSize: 26, lineHeight: 1.45, color: t.muted, margin: "16px 0 0" }}>{sideBySide.plain}</p></Card></Rise>
+        <Rise at={40}><Card style={{ padding: 32 }}><Eyebrow>Plain model</Eyebrow><p style={{ fontSize: 26, lineHeight: 1.45, color: t.muted, margin: "16px 0 0" }}>{sideBySide.plain}</p></Card></Rise>
         <Rise at={80}><Card style={{ padding: 32, border: `1px solid ${t.accent}` }}><Eyebrow style={{ color: t.accent }}>With her fixes</Eyebrow><p style={{ fontSize: 26, lineHeight: 1.45, margin: "16px 0 0" }}>{sideBySide.fixed}</p></Card></Rise>
       </div>
-      <div style={{ position: "absolute", left: 120, top: 640, width: 1680 }}>
-        <Rise at={190}><Eyebrow>{b.testSet}</Eyebrow></Rise>
+      <div style={{ position: "absolute", left: 120, top: 630, width: 1680 }}>
+        <Rise at={190}><Eyebrow>{b.testSet} · plain → her fixes → her rules in code</Eyebrow></Rise>
         {bars.map((bar, i) => <Bar key={bar.label} at={210 + i * 26} {...bar} />)}
         <Rise at={330} style={{ marginTop: 26, fontSize: 24, color: t.muted }}>
-          Colourist {scores.colourist.base.fullyRight}% → {scores.colourist.corrected.fullyRight}% · Nail tech {scores.nails.base.fullyRight}% → {scores.nails.corrected.fullyRight}% fully right, each on its own locked set
+          {others.join(" · ")} fully right, each on its own locked set
         </Rise>
       </div>
     </Scene>
   )
 }
 
-function Bar({ at, label, a, z }: { at: number; label: string; a: number; z: number }) {
+function Bar({ at, label, a, m, z }: { at: number; label: string; a: number; m: number; z: number }) {
   const f = useCurrentFrame()
-  const grow = interpolate(f, [at + 20, at + 60], [a, z], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
+  const grow = interpolate(f, [at + 20, at + 45, at + 60, at + 85], [a, m, m, z], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
   return (
     <Rise at={at} y={12}>
-      <div style={{ display: "grid", gridTemplateColumns: "420px 1fr 280px", alignItems: "center", gap: 28, marginTop: 22 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "420px 1fr 360px", alignItems: "center", gap: 28, marginTop: 22 }}>
         <span style={{ fontSize: 26 }}>{label}</span>
         <span style={{ position: "relative", height: 22, borderRadius: 22, background: t.sunken }}>
           <i style={{ position: "absolute", inset: 0, width: `${grow}%`, borderRadius: 22, background: t.accent }} />
           <i style={{ position: "absolute", top: -6, bottom: -6, left: `${a}%`, width: 3, background: t.muted }} />
         </span>
-        <span style={{ fontFamily: t.display, fontWeight: 700, fontSize: 40, textAlign: "right" }}>
-          <span style={{ color: t.faint, fontSize: 28 }}>{a}% → </span><Count from={a} to={z} at={at + 20} frames={40} suffix="%" />
+        <span style={{ fontFamily: t.display, fontWeight: 700, fontSize: 40, textAlign: "right", whiteSpace: "nowrap" }}>
+          <span style={{ color: t.faint, fontSize: 26 }}>{a}% → {m}% → </span><Count from={m} to={z} at={at + 60} frames={30} suffix="%" />
         </span>
       </div>
     </Rise>

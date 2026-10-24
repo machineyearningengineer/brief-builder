@@ -14,8 +14,8 @@ export const Route = createFileRoute('/stage')({
 })
 
 type Summary = { label: string; fullyRight: number; nextAction: number; fields: number; nextActionByRule: Record<string, number> }
-type Board = { testSet: string; base: Summary | null; corrected: Summary | null }
-const BOARDS = scoreboard as Record<string, Board | undefined>
+type Board = { testSet: string; base: Summary | null; corrected: Summary | null; rules?: Summary | null }
+const BOARDS = scoreboard as unknown as Record<string, Board | undefined>
 const RULE_SHORT: Record<StylistKey, Record<string, string>> = {
   braider: {
     '1': 'Boho vs curly ends', '3': 'Hair not included', '4': 'Budget is a ceiling', '5': 'Offer slots, never book',
@@ -47,6 +47,8 @@ function Stage() {
   const board = BOARDS[stylist]
   const base = board?.base
   const fixed = board?.corrected
+  // The app as it runs: her fixes plus the decisions made in code.
+  const final = board?.rules ?? fixed
 
   return (
     <main className="stage">
@@ -64,9 +66,9 @@ function Stage() {
 
       {base && fixed ? (
         <section className="scores">
-          <Score label="Briefs fully right" a={base.fullyRight} b={fixed.fullyRight} />
-          <Score label="Right next step" a={base.nextAction} b={fixed.nextAction} />
-          <Score label="Fields right" a={base.fields} b={fixed.fields} />
+          <Score label="Briefs fully right" a={base.fullyRight} b={fixed.fullyRight} c={board?.rules?.fullyRight} />
+          <Score label="Right next step" a={base.nextAction} b={fixed.nextAction} c={board?.rules?.nextAction} />
+          <Score label="Fields right" a={base.fields} b={fixed.fields} c={board?.rules?.fields} />
         </section>
       ) : (
         <section className="scores"><p className="muted">This stylist’s locked test hasn’t been scored yet.</p></section>
@@ -74,10 +76,10 @@ function Stage() {
 
       <section className="rules">
         <h2>Right next step, by house rule</h2>
-        {base && fixed && <div className="legend"><span><i className="a" /> {base.label}</span><span><i className="b" /> {fixed.label}</span></div>}
-        {base && fixed && Object.entries(RULE_SHORT[stylist]).filter(([id]) => id in base.nextActionByRule).map(([id, name]) => {
+        {base && final && <div className="legend"><span><i className="a" /> Plain model</span><span><i className="b" /> Brief Builder: her fixes and rules</span></div>}
+        {base && final && Object.entries(RULE_SHORT[stylist]).filter(([id]) => id in base.nextActionByRule).map(([id, name]) => {
           const a = base.nextActionByRule[id] ?? 0
-          const b = fixed.nextActionByRule[id] ?? 0
+          const b = final.nextActionByRule[id] ?? 0
           return (
             <div key={id} className="rule">
               <span className="name">{name}</span>
@@ -197,11 +199,13 @@ function FixLine({ m, name }: { m: RoomMessage; name: string }) {
   )
 }
 
-function Score({ label, a, b }: { label: string; a: number; b: number }) {
+// Plain model → with her fixes → with her rules in code (when scored).
+function Score({ label, a, b, c }: { label: string; a: number; b: number; c?: number }) {
   return (
     <div className="score">
       <p className="eyebrow">{label}</p>
-      <p className="nums"><span className="from">{a}%</span><span className="arrow">→</span><span className="to">{b}%</span></p>
+      <p className="nums"><span className="from">{a}%</span><span className="arrow">→</span>{c == null ? <span className="to">{b}%</span> : <><span className="from">{b}%</span><span className="arrow">→</span><span className="to">{c}%</span></>}</p>
+      <p className="muted steps">{c == null ? 'plain · her fixes' : 'plain · her fixes · her rules in code'}</p>
     </div>
   )
 }
@@ -217,6 +221,7 @@ const STAGE_CSS = `
 .from { font-size: 34px; color: var(--muted); }
 .arrow { font-size: 26px; color: var(--muted); }
 .to { font-size: 60px; font-weight: 750; color: var(--accent); }
+.score .steps { margin: 4px 0 0; font-size: 13px; }
 .rules h2, .live h2 { font-size: 22px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 .legend { display: flex; gap: 18px; font-size: 14px; color: var(--muted); margin-bottom: 10px; }
 .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }

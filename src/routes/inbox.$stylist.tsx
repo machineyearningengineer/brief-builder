@@ -8,6 +8,7 @@ import colouristTags from '../../data/colourist/tags.json'
 import nailsTags from '../../data/nails/tags.json'
 import { BackIcon, SendIcon, SunMoonIcon } from '../client/icons.tsx'
 import { imageUrlForStylist, post, stylistToken, useRoom } from '../client/room.ts'
+import { settle } from '../shared/decide.ts'
 import { closestYes, estimate } from '../shared/pricing.ts'
 import { STYLISTS, isStylist, type RoomMessage, type StylistKey } from '../shared/stylists.ts'
 
@@ -275,7 +276,10 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
   const change = (label: string, mutate: (b: Record<string, any>) => void) => {
     if (!saved) return
     const next = structuredClone(pendingRef.current?.next ?? saved)
+    const before = next.next_action
     mutate(next)
+    // Filling a field updates what's missing and the next step, unless she chose the next step herself.
+    if (next.next_action === before) settle(stylist, next)
     const p = { next, labels: [...new Set([...(pendingRef.current?.labels ?? []), label])] }
     pendingRef.current = p
     setPending(p)

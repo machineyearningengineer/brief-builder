@@ -8,6 +8,7 @@ import { Schema } from "effect"
 import { briefSchemaFor } from "../src/shared/brief.ts"
 import { callBrief } from "../src/server/brief-call.ts"
 import { closestCorrections, correctionsBlock, type Correction } from "../src/server/corrections.ts"
+import { canonicalWindow, decide } from "../src/shared/decide.ts"
 
 const ROOT = join(import.meta.dirname, "..")
 const args = process.argv.slice(2)
@@ -52,10 +53,18 @@ async function worker() {
     const dm = dms[next++]
     const corrections = withCorrections ? correctionsBlock(closestCorrections(dm.text, pool.filter((c) => c.id !== dm.id))) : ""
     const r = await callBrief({ key: env.MUBIT_API_KEY, profile, tags, dm, effort, record, corrections })
-    const want = flat(dm.label)
-    const got = flat(r.brief)
+    // Windows compare in one vocabulary on both sides ("any weekday after 5" is "after work").
+    const label = { ...dm.label, when: { ...dm.label.when, window: canonicalWindow(dm.label.when.window) } }
+    const raw = r.brief ? { ...(r.brief as any), when: { ...(r.brief as any).when, window: canonicalWindow((r.brief as any).when?.window) } } : null
+    const want = flat(label)
+    const got = flat(raw)
     const wrong = r.brief ? Object.keys(want).filter((k) => want[k] !== got[k]) : Object.keys(want)
-    const row = { id: dm.id, status: r.status, ms: r.ms, request_id: r.requestId, valid: isValid(r.brief), right: Object.keys(want).length - wrong.length, of: Object.keys(want).length, wrong, tokens_in: r.tokensIn, tokens_out: r.tokensOut, error: r.error, brief: r.brief }
+    // The same brief after the app's code rules (next step, missing, day-word dates).
+    const ruled = r.brief ? structuredClone(r.brief as any) : null
+    if (ruled) decide(stylist, ruled, dm)
+    const gotRuled = flat(ruled)
+    const wrongRules = ruled ? Object.keys(want).filter((k) => want[k] !== gotRuled[k]) : Object.keys(want)
+    const row = { id: dm.id, status: r.status, ms: r.ms, request_id: r.requestId, valid: isValid(r.brief), right: Object.keys(want).length - wrong.length, of: Object.keys(want).length, wrong, wrongRules, tokens_in: r.tokensIn, tokens_out: r.tokensOut, error: r.error, brief: r.brief }
     results.push(row)
     console.log(`${dm.id.padEnd(5)} ${r.status} ${String(r.ms).padStart(6)} ms  ${row.valid ? "valid  " : "INVALID"} ${row.right}/${row.of}${wrong.length ? "  wrong: " + wrong.join(", ") : ""}${r.error ? "  " + JSON.stringify(r.error).slice(0, 160) : ""}`)
   }

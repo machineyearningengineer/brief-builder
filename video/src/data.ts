@@ -17,20 +17,6 @@ export const inboxNoise = [
   { name: "bisi", text: "can u do these? saturday", photo: true },
 ]
 
-// Room run 2: the photo reader said small, the stylist fixed it to smedium.
-export const hero = {
-  dm: "can u do these? saturday",
-  tags: [
-    { label: "Knotless", conf: 96 },
-    { label: "Bum length", conf: 84 },
-    { label: "Small", conf: 82 },
-  ],
-  firstReply: "Yes, I can do these. Small knotless braids at butt length are £240, excluding hair. I have slots available today, what time would suit you?",
-  fixedReply: "Yes, I can do these for £220, hair not included. I have Saturday at 10am or 2pm available, would either suit?",
-  followUp: "does that include the hair?",
-  followUpReply: "No, the £220 doesn’t include the hair. I can provide it for an extra £15, making £235 altogether.",
-}
-
 // Locked braider test, DM h022: same model, with and without her fixes.
 export const sideBySide = {
   dm: "hiya can u do knotless medium to my waist curls at the ends like this next week anytime how much?",
@@ -65,7 +51,7 @@ export const stylists: { name: string; area: string; craft: string; dm: string; 
 ]
 
 type Summary = { fullyRight: number; nextAction: number; nextActionByRule: Record<string, number> }
-const board = scoreboard as unknown as Record<string, { testSet: string; base: Summary; corrected: Summary }>
+const board = scoreboard as unknown as Record<string, { testSet: string; base: Summary; corrected: Summary; rules?: Summary }>
 export const scores = {
   braider: board.braider,
   colourist: board.colourist,

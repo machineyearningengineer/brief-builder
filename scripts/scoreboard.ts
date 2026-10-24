@@ -12,9 +12,10 @@ const profile = JSON.parse(readFileSync(join(ROOT, "data", stylist, "profile.jso
 const runs = readdirSync(join(ROOT, "runs")).filter((f) => f.includes(`-${stylist}-heldout-`)).sort()
 const newest = (corrected: boolean) => runs.filter((f) => f.endsWith("-corrected.jsonl") === corrected).at(-1)
 
-function summarise(file: string | undefined, label: string) {
+function summarise(file: string | undefined, label: string, withRules = false) {
   if (!file) return null
-  const rows = lines(join(ROOT, "runs", file)).filter((r) => r.status === 200)
+  // withRules scores the same briefs after the app's code rules (scripts/replay.ts wrongRules).
+  const rows = lines(join(ROOT, "runs", file)).filter((r) => r.status === 200).map((r) => (withRules ? { ...r, wrong: r.wrongRules ?? r.wrong, right: r.of - (r.wrongRules ?? r.wrong).length } : r))
   const share = (f: (r: any) => boolean, rs = rows) => (rs.length ? Math.round((100 * rs.filter(f).length) / rs.length) : 0)
   const byRule: Record<string, number> = {}
   for (const rule of profile.house_rules.map((r: any) => r.id)) {
@@ -37,9 +38,10 @@ function summarise(file: string | undefined, label: string) {
 const out = {
   stylist,
   testSet: `${data.size} locked DMs, never recorded by Mubit`,
-  rules: Object.fromEntries(profile.house_rules.map((r: any) => [r.id, r.rule])),
+  houseRules: Object.fromEntries(profile.house_rules.map((r: any) => [r.id, r.rule])),
   base: summarise(newest(false), "gpt-6-luna"),
   corrected: summarise(newest(true), "gpt-6-luna + stylist fixes"),
+  rules: summarise(newest(true), "+ her rules in code", true),
   adapter: null as null | ReturnType<typeof summarise>,
 }
 const path = join(ROOT, "src", "shared", "scoreboard.json")
@@ -48,4 +50,4 @@ const all = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {}
 const merged = "base" in all ? { [all.stylist]: all } : all
 merged[stylist] = out
 writeFileSync(path, JSON.stringify(merged, null, 2) + "\n")
-console.log(`base ${out.base?.fullyRight}% fully right · with fixes ${out.corrected?.fullyRight}% (${out.base?.run} · ${out.corrected?.run})`)
+console.log(`base ${out.base?.fullyRight}% fully right · with fixes ${out.corrected?.fullyRight}% · with rules in code ${out.rules?.fullyRight}% (${out.base?.run} · ${out.corrected?.run})`)

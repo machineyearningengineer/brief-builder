@@ -16,6 +16,7 @@ import nailsCorrections from "../../data/nails/corrections.jsonl?raw"
 import braiderVoice from "../../data/braider/voice.jsonl?raw"
 import colouristVoice from "../../data/colourist/voice.jsonl?raw"
 import nailsVoice from "../../data/nails/voice.jsonl?raw"
+import { datesNote, decide } from "../shared/decide.ts"
 import { estimate } from "../shared/pricing.ts"
 import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
@@ -296,7 +297,7 @@ export class StylistRoom extends DurableObject<Env> {
     // the before-and-after. The plain call is never recorded, so it can't train the adapter.
     // Both see the client's conversation so far, so a follow-up continues the same brief.
     const [result, plain] = await Promise.all([
-      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, corrections: correctionsBlock(used) + voiceBlock(closestVoice(m.text, this.voicePool()), this.voiceTerms()) + settledBlock(history.at(-1)?.brief ?? null) }).catch(failed),
+      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, corrections: correctionsBlock(used) + voiceBlock(closestVoice(m.text, this.voicePool()), this.voiceTerms()) + settledBlock(history.at(-1)?.brief ?? null) + datesNote(m.text, m.receivedAt) }).catch(failed),
       callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, record: "off" }).catch(failed),
     ])
     const plainBrief = plain.brief as Record<string, any> | null
@@ -318,6 +319,8 @@ export class StylistRoom extends DurableObject<Env> {
     // A field carried forward from earlier in the thread wasn't really cleared.
     const carried = brief ? carryForward(brief, history.at(-1)?.brief ?? null, m.text) : []
     const stillCleared = guarded.filter((p) => !carried.includes(p))
+    // Next step, what's missing, dates from day words and time windows are decided in code.
+    if (brief) decide(this.stylist!, brief, { text: m.text, received_at: m.receivedAt })
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
@@ -371,7 +374,7 @@ export class StylistRoom extends DurableObject<Env> {
     const result = await callBrief({
       key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low",
       dm: { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null },
-      corrections: correctionsBlock([...own, ...others]) + voiceBlock(closestVoice(m.text, this.voicePool()), this.voiceTerms()),
+      corrections: correctionsBlock([...own, ...others]) + voiceBlock(closestVoice(m.text, this.voicePool()), this.voiceTerms()) + datesNote(m.text, m.receivedAt),
       history: this.history(m),
     }).catch(() => null)
     const latest = this.message(id)
