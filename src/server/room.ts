@@ -309,11 +309,13 @@ export class StylistRoom extends DurableObject<Env> {
     // Evidence can come from any message in the conversation, not just the newest one.
     const said = [...history.map((h) => h.dm.text), m.text].join("\n")
     const guarded = brief ? guardEvidence(brief, said, trusted) : []
-    if (brief) carryForward(brief, history.at(-1)?.brief ?? null, m.text)
+    // A field carried forward from earlier in the thread wasn't really cleared.
+    const carried = brief ? carryForward(brief, history.at(-1)?.brief ?? null, m.text) : []
+    const stillCleared = guarded.filter((p) => !carried.includes(p))
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
-    this.save({ ...m, status: brief ? "drafted" : "failed", brief, requestId: result.requestId, ms: result.ms, correctionsUsed: used.length, guarded, baseline })
+    this.save({ ...m, status: brief ? "drafted" : "failed", brief, requestId: result.requestId, ms: result.ms, correctionsUsed: used.length, guarded: stillCleared, baseline })
   }
 
   private async correct(body: { id?: string; corrected?: Record<string, any> }) {

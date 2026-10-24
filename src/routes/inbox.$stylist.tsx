@@ -8,7 +8,7 @@ import colouristTags from '../../data/colourist/tags.json'
 import nailsTags from '../../data/nails/tags.json'
 import { BackIcon, SendIcon, SunMoonIcon } from '../client/icons.tsx'
 import { imageUrlForStylist, post, stylistToken, useRoom } from '../client/room.ts'
-import { estimate } from '../shared/pricing.ts'
+import { closestYes, estimate } from '../shared/pricing.ts'
 import { STYLISTS, isStylist, type RoomMessage, type StylistKey } from '../shared/stylists.ts'
 
 export const Route = createFileRoute('/inbox/$stylist')({
@@ -244,6 +244,7 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
   const pendingRef = useRef<Pending | null>(null)
   const brief = pending?.next ?? saved
   const price = estimate(stylist, brief)
+  const nearest = closestYes(stylist, brief)
   const threshold = 0.6
 
   useEffect(() => {
@@ -312,6 +313,7 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
       if (t?.via === 'fix') return 'Like a photo you fixed'
       return t ? `From photo · ${Math.round(t.confidence * 100)}%` : 'From photo'
     }
+    if (ev === '[earlier]') return 'Earlier in this chat'
     return ev ? `“${clip(String(ev), 26)}”` : ''
   }
 
@@ -426,6 +428,18 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
                 </select>
               </label>
               {price && <p className="price"><b>{price.from ? 'from ' : ''}£{price.amount}</b>{price.note && <span className="muted"> · {price.note}</span>}</p>}
+              {nearest && !m.reply && (
+                <div className="nearest rise">
+                  <span><small className="eyebrow">Closest yes</small><span>{nearest.label}</span>{nearest.amount != null && <b>£{nearest.amount}</b>}</span>
+                  <button type="button" className="btn" onClick={() => change('Closest yes', (b) => {
+                    for (const [path, v] of Object.entries(nearest.change)) {
+                      const keys = path.split('.'); const last = keys.pop()!
+                      keys.reduce((o: any, k) => (o[k] ??= {}), b)[last] = v
+                    }
+                    if (b.next_action === 'decline' || b.next_action === 'refer') b.next_action = 'quote'
+                  })}>Use this</button>
+                </div>
+              )}
             </div>
 
             {SHEET[stylist].map((s) => (
@@ -602,6 +616,9 @@ const CSS = `
 .seg button:hover { border-color: var(--faint); color: var(--ink); }
 .seg button.on { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
 .line.fixed .seg button.on { background: var(--good); border-color: var(--good); color: var(--bg); }
+.nearest { margin-top: 10px; padding: 12px 14px; border: 1px dashed var(--accent); border-radius: var(--radius); display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.nearest span { display: grid; gap: 2px; min-width: 0; }
+.nearest .btn { white-space: nowrap; flex: none; }
 .correction { margin: 0 16px 12px; padding: 14px 16px; border-radius: var(--radius); background: var(--accent-soft); display: grid; gap: 10px; }
 .correction p { margin: 0; }
 .extras .v { gap: 6px; }

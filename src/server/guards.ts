@@ -57,7 +57,7 @@ export function guardEvidence(brief: Record<string, any>, text: string, trustedP
     const value = getPath(brief, path)
     if (value === undefined || value === "unknown") continue
     const quote = evidence[path]
-    const ok = quote === "[photo]" ? trustedPhotoFields.has(path.split(".").pop()!) : !!quote && haystack.includes(quote.toLowerCase())
+    const ok = quote === "[photo]" ? trustedPhotoFields.has(path.split(".").pop()!) : quote === "[earlier]" || (!!quote && haystack.includes(quote.toLowerCase()))
     if (!ok) {
       setPath(brief, path, "unknown")
       delete evidence[path]
@@ -82,8 +82,8 @@ export function carryForward(brief: Record<string, any>, before: Record<string, 
     const quote = brief.evidence[path]
     if (now !== "unknown" && typeof quote === "string" && quote !== "[photo]" && said.includes(quote.toLowerCase())) continue
     setPath(brief, path, was)
-    if (before.evidence?.[path]) brief.evidence[path] = before.evidence[path]
-    else delete brief.evidence[path]
+    // Settled earlier in the conversation: by the client's words, a photo or the stylist's fix.
+    brief.evidence[path] = "[earlier]"
     carried.push(path)
   }
   return carried
