@@ -32,7 +32,11 @@ async function media(request: Request, env: Env, url: URL): Promise<Response> {
   if (!asset.ok) return new Response("Not found", { status: 404 })
   const bytes = await asset.arrayBuffer()
   const total = bytes.byteLength
-  const headers = { "content-type": "video/mp4", "accept-ranges": "bytes", "cache-control": "public, max-age=3600" }
+  // ?download saves the file instead of playing it.
+  const headers = {
+    "content-type": "video/mp4", "accept-ranges": "bytes", "cache-control": "public, max-age=3600",
+    ...(url.searchParams.has("download") ? { "content-disposition": `attachment; filename="${name}"` } : {}),
+  }
   const range = request.headers.get("range")?.match(/^bytes=(\d*)-(\d*)$/)
   if (!range) return new Response(bytes, { headers: { ...headers, "content-length": String(total) } })
   // "bytes=-500" asks for the last 500 bytes; "bytes=500-" for everything from 500.

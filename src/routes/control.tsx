@@ -13,9 +13,9 @@ export const Route = createFileRoute('/control')({
 
 const RELEASE = 'https://github.com/machineyearningengineer/brief-builder/releases/download/v1.0'
 const FILES = [
-  { label: 'The film', note: 'Submission cut, under 2 minutes', href: `${RELEASE}/brief-builder-launch.mp4` },
-  { label: 'Upright film', note: 'The full film for phones, 1:59', href: `${RELEASE}/brief-builder-mobile.mp4` },
-  { label: 'Story cut', note: 'Upright, under a minute, for social', href: `${RELEASE}/brief-builder-story.mp4` },
+  { label: 'The film', note: 'Landscape, 1:59', href: '/media/brief-builder.mp4?download' },
+  { label: 'Upright film', note: 'For phones, Reels and TikTok, 1:59', href: '/media/brief-builder-mobile.mp4?download' },
+  { label: 'Story cut', note: 'Upright, 0:59, for Instagram stories', href: '/media/brief-builder-story.mp4?download' },
   { label: 'Live footage', note: 'The real stage, 25 seconds', href: `${RELEASE}/brief-builder-live-footage.mp4` },
   { label: 'Deck', note: 'PDF, 10 slides', href: `${RELEASE}/brief-builder-deck.pdf` },
   { label: 'Code', note: 'GitHub repository', href: 'https://github.com/machineyearningengineer/brief-builder' },
@@ -86,7 +86,12 @@ function Control() {
         <h2 id="files">Files</h2>
         <ul className="ctl-list">
           {FILES.map((f) => (
-            <li key={f.label}><a href={f.href} target="_blank" rel="noreferrer" className="ctl-link"><b>{f.label}</b><span className="muted">{f.note}</span><span aria-hidden="true">↗</span></a></li>
+            <li key={f.label}>
+              {/* The films save straight to the device; everything else opens in a new tab. */}
+              {f.href.startsWith('/media/')
+                ? <a href={f.href} download className="ctl-link"><b>{f.label}</b><span className="muted">{f.note}</span><span aria-hidden="true">↓</span></a>
+                : <a href={f.href} target="_blank" rel="noreferrer" className="ctl-link"><b>{f.label}</b><span className="muted">{f.note}</span><span aria-hidden="true">↗</span></a>}
+            </li>
           ))}
         </ul>
       </section>

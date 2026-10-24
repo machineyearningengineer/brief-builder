@@ -126,6 +126,7 @@ function Film() {
         </div>
       </div>
       <video key={v.src} src={v.src} poster={v.poster} controls playsInline preload="metadata" />
+      <a className="film-save" href={`${v.src}?download`} download>Download this cut</a>
     </section>
   )
 }
@@ -207,6 +208,8 @@ const CSS = `
 .cuts button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .film video { display: block; width: 100%; border-radius: 22px; background: #0b090a; border: 1px solid var(--line); box-shadow: var(--shadow); aspect-ratio: 16 / 9; }
 .film.upright video { aspect-ratio: 9 / 16; width: min(100%, 380px, calc(78svh * 9 / 16)); justify-self: center; }
+.film-save { justify-self: start; font-size: 14px; color: var(--muted); }
+.film.upright .film-save { justify-self: center; }
 .foot { display: flex; gap: 18px; font-size: 14px; }
 .foot a { color: var(--muted); }
 @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } .how { grid-template-columns: 1fr; gap: 0; } .how li { border: 0; border-bottom: 1px dashed var(--line); border-radius: 0; padding: 12px 0; grid-template-columns: 30px 1fr; column-gap: 10px; } .how li::before { grid-row: span 2; margin: 0; } .home { padding-block: 32px 48px; gap: 28px; } }
