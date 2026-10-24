@@ -43,7 +43,7 @@ function Stage() {
   const latest = messages.at(-1)
   const fixes = messages.filter((m) => m.corrected).length
   const lastFix = [...messages].reverse().find((m) => m.corrected && m.changed.length)
-  const adapter = (mubit.adapters as Record<string, { version: string; base: string; quality: number; target: number; tests: number; kept: number; state: string; next?: string | null }>)[stylist]
+  const adapter = (mubit.adapters as Record<string, { version: string; base: string; quality: number | null; target: number; tests: number | null; kept: number; state: string; next?: string | null; calls?: number }>)[stylist]
   const board = BOARDS[stylist]
   const base = board?.base
   const fixed = board?.corrected
@@ -135,8 +135,8 @@ function Stage() {
           <div className="mubit">
             <p className="eyebrow">{STYLISTS[stylist].name.split(' ')[0]}’s own model · in training on Mubit</p>
             <p><b>{adapter.version}</b> on {adapter.base} · trained on {adapter.kept}+ kept examples</p>
-            <div className="meter" aria-label={`${adapter.quality}% of target`}><i style={{ width: `${adapter.quality}%` }} /><span style={{ left: `${adapter.target}%` }} /></div>
-            <p className="muted">Matches the big model on {adapter.quality}% of {adapter.tests} test cases, aiming for {adapter.target}%. {adapter.state}. Checked {mubit.checkedAt}.</p>
+            <div className="meter" aria-label={adapter.quality == null ? 'Training' : `${adapter.quality}% of target`}><i style={{ width: `${adapter.quality ?? 0}%` }} /><span style={{ left: `${adapter.target}%` }} /></div>
+            <p className="muted">{adapter.quality == null ? `${adapter.state}, aiming for ${adapter.target}%` : `Matches the big model on ${adapter.quality}% of ${adapter.tests} test cases, aiming for ${adapter.target}%. ${adapter.state}`}. Checked {mubit.checkedAt}.</p>
             {adapter.next && <p className="muted">{adapter.next}</p>}
           </div>
         )}

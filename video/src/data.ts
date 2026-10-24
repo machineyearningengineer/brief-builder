@@ -72,6 +72,6 @@ export const scores = {
   nails: board.nails,
 }
 
-type Adapter = { version: string; base: string; quality: number; target: number; kept: number; state: string; next?: string | null }
+type Adapter = { version: string; base: string; quality: number | null; target: number; kept: number; state: string; next?: string | null }
 export const adapters = mubit.adapters as Record<string, Adapter | undefined>
 export const checkedAt = mubit.checkedAt

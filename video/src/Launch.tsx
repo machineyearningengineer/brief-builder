@@ -170,7 +170,7 @@ function Mubit() {
         <Rise at={170} style={{ position: "absolute", left: 120, top: 640, width: 1100 }}>
           <div style={{ fontSize: 26, color: t.muted }}><b style={{ color: t.accent }}>In progress.</b> Amara’s own model, {braider.version} on {braider.base}, trained on {braider.kept} of her kept examples</div>
           <div style={{ position: "relative", height: 22, borderRadius: 22, background: t.sunken, marginTop: 18 }}>
-            <i style={{ position: "absolute", inset: 0, width: `${braider.quality}%`, borderRadius: 22, background: t.accent }} />
+            <i style={{ position: "absolute", inset: 0, width: `${braider.quality ?? 0}%`, borderRadius: 22, background: t.accent }} />
             <i style={{ position: "absolute", top: -8, bottom: -8, left: `${braider.target}%`, width: 3, background: t.ink }} />
           </div>
           <div style={{ fontSize: 22, color: t.faint, marginTop: 14 }}>Matches the big model on {braider.quality}% of test cases, aiming for {braider.target}%. {braider.state}. Checked {checkedAt}.{braider.next ? ` ${braider.next}` : ""}</div>
