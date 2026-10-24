@@ -1,7 +1,9 @@
 // Reads a client's screenshots into tags from the stylist's fixed list, each with a confidence.
 // It runs through Mubit like every other model call, under its own fixed instructions, so it
 // forms its own Mubit task. Anything outside the tag list is dropped.
-import { BRIEF_MODEL, MUBIT_OPENAI_BASE } from "./brief-call.ts"
+import { Effect } from "effect"
+import { BRIEF_MODEL } from "./brief-call.ts"
+import { contentJson, postChat } from "./mubit.ts"
 
 type Tags = { trust_threshold: number; reader_fields: string[]; fields: Record<string, string[]> }
 export type ReaderTag = { field: string; tag: string; confidence: number }
@@ -37,33 +39,31 @@ function base64(bytes: ArrayBuffer): string {
 
 export async function readPhotos(opts: { key: string; tags: Tags; photos: { mime: string; bytes: ArrayBuffer }[]; fixes?: ReaderFix[] }): Promise<ReaderTag[] | null> {
   if (!opts.photos.length) return null
-  const res = await fetch(`${MUBIT_OPENAI_BASE}/chat/completions`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${opts.key}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      model: BRIEF_MODEL,
-      reasoning_effort: "low",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: instructions(opts.tags) },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: `What do these photos show?${fixesNote(opts.fixes ?? [])}` },
-            ...opts.photos.map((p) => ({ type: "image_url", image_url: { url: `data:${p.mime};base64,${base64(p.bytes)}` } })),
-          ],
-        },
-      ],
-    }),
-  })
-  if (!res.ok) return null
-  const body: any = await res.json().catch(() => null)
-  let parsed: any
-  try {
-    parsed = JSON.parse(body?.choices?.[0]?.message?.content ?? "{}")
-  } catch {
-    return null
-  }
+  const parsed: any = await Effect.runPromise(
+    postChat({
+      key: opts.key,
+      attemptMs: 40_000,
+      body: {
+        model: BRIEF_MODEL,
+        reasoning_effort: "low",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: instructions(opts.tags) },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `What do these photos show?${fixesNote(opts.fixes ?? [])}` },
+              ...opts.photos.map((p) => ({ type: "image_url", image_url: { url: `data:${p.mime};base64,${base64(p.bytes)}` } })),
+            ],
+          },
+        ],
+      },
+    }).pipe(
+      Effect.flatMap(contentJson),
+      // No photo tags is a safe answer: the brief is still drafted from the words.
+      Effect.orElseSucceed(() => null),
+    ),
+  )
   const seen = new Set<string>()
   const out: ReaderTag[] = []
   for (const t of Array.isArray(parsed?.tags) ? parsed.tags : []) {

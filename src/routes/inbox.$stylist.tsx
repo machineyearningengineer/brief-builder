@@ -406,9 +406,9 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
           ))}
         </div>
         <PriceCorrection m={m} stylist={stylist} token={token} />
-        {!m.reply && saved && (
+        {!m.reply && (saved || m.status === 'failed') && (
           <form className="reply" onSubmit={(e) => { e.preventDefault(); void send() }}>
-            <label htmlFor="reply" className="eyebrow">{m.redrafting ? 'Updating the reply from your fix' : 'Draft reply'}</label>
+            <label htmlFor="reply" className="eyebrow">{m.redrafting ? 'Updating the reply from your fix' : m.status === 'failed' ? 'Your reply' : 'Draft reply'}</label>
             <div className={m.redrafting ? 'reply-box busy' : 'reply-box'}>
               <textarea id="reply" rows={4} value={reply} onChange={(e) => setReply(e.target.value)} disabled={m.redrafting} />
               <button type="submit" className="send on" disabled={!reply.trim() || m.redrafting} aria-label="Send reply">
@@ -423,7 +423,12 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
             <p className="muted">{m.baseline.reply}</p>
           </details>
         )}
-        {m.status === 'failed' && !m.reply && <p className="muted pad">No draft this time. Reply by hand.</p>}
+        {m.status === 'failed' && !m.reply && (
+          <p className="failed pad">
+            <span>No draft this time: Mubit didn’t answer. Reply by hand, or</span>
+            <button className="btn" onClick={() => void post(stylist, 'retry', { id: m.id }, token)}>Try again</button>
+          </p>
+        )}
         {error && <p className="error pad" role="alert">{error}</p>}
       </section>
 
@@ -568,6 +573,7 @@ const CSS = `
 .who-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; margin: 0 8px 12px; border-radius: 99px; background: var(--sunken); }
 .who-switch a { text-align: center; padding: 7px 0; border-radius: 99px; font-weight: 600; font-size: 14px; color: var(--muted); text-decoration: none; }
 .who-switch a.on { background: var(--accent); color: var(--on-accent); }
+.failed { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--muted); }
 .thread-bar .stage-toggle { margin-left: auto; font-size: 13px; padding: 6px 12px; }
 .thread-bar .stage-toggle.off { border-color: var(--accent); color: var(--accent); }
 .list h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }

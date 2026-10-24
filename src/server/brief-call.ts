@@ -1,10 +1,11 @@
 // One brief call through Mubit's OpenAI route. Server-side only: Mubit answers no CORS
 // preflight, and the key must never reach a browser.
+import { Effect } from "effect"
 import { instructionsFor, userMessage, type ReaderTag } from "./brief-prompt.ts"
+import { contentJson, postChat } from "./mubit.ts"
 
-export const MUBIT_OPENAI_BASE = "https://api.mubit.ai/openai/v1"
+export { MUBIT_OPENAI_BASE } from "./mubit.ts"
 export const BRIEF_MODEL = "gpt-6-luna"
-
 export type BriefCallResult = {
   status: number
   ms: number
@@ -30,15 +31,10 @@ export async function callBrief(opts: {
   // The model then returns the brief for the whole conversation, not just the new message.
   history?: { dm: { received_at: string; text: string; photo: { reader_output: ReaderTag[] } | null }; brief: Record<string, unknown> }[]
 }): Promise<BriefCallResult> {
-  const started = Date.now()
-  const res = await fetch(`${MUBIT_OPENAI_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${opts.key}`,
-      "content-type": "application/json",
-      ...(opts.record === "off" ? { "x-middleware-record": "off" } : {}),
-    },
-    body: JSON.stringify({
+  const call = postChat({
+    key: opts.key,
+    record: opts.record,
+    body: {
       model: BRIEF_MODEL,
       response_format: { type: "json_object" },
       ...(opts.effort ? { reasoning_effort: opts.effort } : {}),
@@ -50,21 +46,16 @@ export async function callBrief(opts: {
         ]),
         { role: "user", content: userMessage(opts.dm, opts.corrections) },
       ],
+    },
+  }).pipe(
+    Effect.flatMap((reply) => contentJson(reply).pipe(Effect.map((brief) => ({ reply, brief })))),
+    Effect.match({
+      onSuccess: ({ reply, brief }): BriefCallResult => ({
+        status: reply.status, ms: reply.ms, requestId: reply.requestId, brief, error: null,
+        tokensIn: reply.json?.usage?.prompt_tokens ?? null, tokensOut: reply.json?.usage?.completion_tokens ?? null,
+      }),
+      onFailure: (e): BriefCallResult => ({ status: e.status ?? 0, ms: 0, requestId: null, brief: null, error: `${e.reason}: ${e.detail}`, tokensIn: null, tokensOut: null }),
     }),
-  })
-  const ms = Date.now() - started
-  const body: any = await res.json().catch(() => null)
-  let brief: unknown = null
-  let error: unknown = res.ok ? null : body?.error ?? body
-  if (res.ok) {
-    try {
-      brief = JSON.parse(body.choices[0].message.content)
-    } catch (e) {
-      error = `reply wasn't JSON: ${String(e)}`
-    }
-  }
-  return {
-    status: res.status, ms, requestId: res.headers.get("x-middleware-request-id"), brief, error,
-    tokensIn: body?.usage?.prompt_tokens ?? null, tokensOut: body?.usage?.completion_tokens ?? null,
-  }
+  )
+  return Effect.runPromise(call)
 }

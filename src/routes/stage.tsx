@@ -197,7 +197,7 @@ function Model({ adapter, first, fixes }: { adapter?: Adapter; first: string; fi
     <div className="model">
       <span className="what"><b>{first}’s own model</b> {adapter.quality == null ? 'is training on Mubit' : `matches the big model ${adapter.quality}% of the time, aiming for ${adapter.target}%`}</span>
       <span className="meter"><i style={{ width: `${adapter.quality ?? 0}%` }} /><s style={{ left: `${adapter.target}%` }} /></span>
-      <span className="muted">{fixes} {fixes === 1 ? 'fix' : 'fixes'} sent to Mubit this session</span>
+      <span className="muted"><b className="bump" key={fixes}>{fixes}</b> {fixes === 1 ? 'fix' : 'fixes'} sent to Mubit this session</span>
     </div>
   )
 }
@@ -206,30 +206,37 @@ function Latest({ m, photo, stylist, token, first }: { m: RoomMessage; photo?: s
   const brief = m.corrected ?? m.brief
   const facts = brief ? [brief.service, brief.look?.length, brief.look?.size ?? brief.look?.shade, brief.look?.shape, brief.look?.finish]
     .filter((v) => v && v !== 'unknown').map(say) : []
+  const drafting = m.status === 'drafting' || (!brief && m.status !== 'failed')
   return (
-    <div className="latest rise" key={m.id + m.status}>
+    // Keyed by message only: the card rises once, and each state change animates its own part.
+    <div className="latest rise" key={m.id}>
       <div className="dm">
         {photo && token && <StagePhoto stylist={stylist} id={photo} token={token} />}
         <div>
           {m.text && <p className="text">“{m.text}”</p>}
-          {m.status === 'drafting' && <p className="muted"><span className="dots"><i /><i /><i /></span> Drafting</p>}
           {brief && (
             <ul className="facts">
-              {facts.map((f) => <li key={f}>{f}</li>)}
-              <li className="next">{say(brief.next_action)}</li>
+              {facts.map((f) => <li key={f} className="pop">{f}</li>)}
+              <li className="next pop" key={`next-${brief.next_action}`}>{say(brief.next_action)}</li>
             </ul>
           )}
         </div>
       </div>
-      {brief && m.baseline && (
+      {m.status === 'failed' && !m.reply && <p className="muted">No draft this time. {first} is replying by hand.</p>}
+      {drafting ? (
         <div className="versus">
-          <div className="side plain"><b>Plain model</b><p>{m.baseline.reply}</p></div>
+          <div className="side plain skeleton"><b>Plain model</b><i /><i /><i /></div>
+          <div className="side ours skeleton"><b>Drafting through Mubit<span className="dots"><i /><i /><i /></span></b><i /><i /><i /></div>
+        </div>
+      ) : brief && m.baseline && (
+        <div className="versus">
+          <div className="side plain"><b>Plain model</b><p className="arrive">{m.baseline.reply}</p></div>
           {m.reply ? (
-            <div className="side ours sent settle" key="sent"><b>Sent to the client ✓</b><p>{m.reply}</p>{m.extra.map((x, i) => <p key={i} className="extra">{x}</p>)}</div>
+            <div className="side ours sent" key="sent"><b><span className="tick">✓</span> Sent to the client</b><p className="arrive">{m.reply}</p>{m.extra.map((x, i) => <p key={i} className="extra arrive">{x}</p>)}</div>
           ) : (
-            <div className={m.redrafting ? 'side ours busy' : 'side ours'} key={m.redrafting ? 'busy' : 'draft'}>
+            <div className={m.redrafting ? 'side ours busy' : 'side ours'}>
               <b>{m.redrafting ? `Re-drafting with ${first}’s fix` : `${first}’s draft`}{m.redrafting && <span className="dots"><i /><i /><i /></span>}</b>
-              <p>{brief.reply_draft}</p>
+              <p className="arrive glow" key={brief.reply_draft}>{brief.reply_draft}</p>
             </div>
           )}
         </div>
@@ -321,6 +328,35 @@ const STAGE_CSS = `
 .side.ours.sent { background: var(--good-soft); outline-color: var(--good); }
 .side.ours.sent b { color: var(--good); }
 .side .extra { padding-top: 8px; border-top: 1px dashed var(--line); }
+/* State changes, each with its own small motion. Off when the viewer asks for less motion. */
+.skeleton i { display: block; height: 12px; border-radius: 6px; background: var(--line); }
+.skeleton i:nth-of-type(2) { width: 86%; }
+.skeleton i:nth-of-type(3) { width: 62%; }
+.dots { display: inline-flex; gap: 4px; margin-left: 8px; }
+.dots i { width: 6px; height: 6px; border-radius: 6px; background: currentColor; opacity: 0.4; }
+.side.ours.busy { position: relative; overflow: hidden; }
+.side.ours.sent .tick { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 22px; background: var(--good); color: var(--on-accent); font-size: 13px; }
+.model .bump { color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton i { background: linear-gradient(90deg, var(--line) 0%, var(--sunken) 50%, var(--line) 100%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+  .dots i { animation: blink 1.2s infinite; }
+  .dots i:nth-child(2) { animation-delay: 0.2s; }
+  .dots i:nth-child(3) { animation-delay: 0.4s; }
+  .side.ours.busy::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, oklch(100% 0 0 / 0.16) 50%, transparent 80%); background-size: 220% 100%; animation: sweep 1.4s var(--ease) infinite; pointer-events: none; }
+  .arrive { animation: arrive 520ms var(--ease) both; }
+  .glow { animation: arrive 520ms var(--ease) both, glow 1.6s var(--ease) both; border-radius: 8px; }
+  .pop { animation: pop 360ms var(--ease) both; }
+  .side.ours.sent { animation: sent 480ms var(--ease) both; }
+  .side.ours.sent .tick { animation: pop 420ms 120ms var(--ease) both; }
+  .fixline { animation: slide-in 420ms var(--ease) both; }
+  .model .bump { display: inline-block; animation: pop 420ms var(--ease) both; }
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+@keyframes sweep { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes arrive { from { opacity: 0; filter: blur(6px); transform: translateY(6px); } to { opacity: 1; filter: none; transform: none; } }
+@keyframes glow { 0% { box-shadow: 0 0 0 0 transparent; } 25% { box-shadow: 0 0 0 6px color-mix(in oklch, var(--accent) 35%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: none; } }
+@keyframes sent { from { transform: scale(0.97); } to { transform: none; } }
 .fixline { margin: 0; padding: 12px 16px; border-radius: 16px; background: var(--good-soft); font-size: 18px; }
 .fixline b { color: var(--good); }
 .voice { margin: 0; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 16px; }

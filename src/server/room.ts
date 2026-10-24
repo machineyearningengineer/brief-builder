@@ -32,6 +32,9 @@ const PROFILES = {
 
 const parseJsonl = <T = Correction>(s: string): T[] => s.trim() ? s.trim().split("\n").map((l) => JSON.parse(l)) : []
 const PHOTO_LIKENESS = 0.5
+// A draft or re-draft still unfinished after this long is retried once by the alarm, then failed.
+// Longer than one model call's whole budget (photo reader plus brief), so it never races a live call.
+const STUCK_MS = 200_000
 const MAX_DM = 1000
 const MAX_CORRECTION_BYTES = 8_000
 const DM_PER_WINDOW = 8
@@ -79,6 +82,8 @@ export class StylistRoom extends DurableObject<Env> {
     if (!cols.includes("sent_price")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN sent_price INTEGER`)
     if (!cols.includes("extra")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN extra TEXT`)
     if (!cols.includes("hidden")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN hidden INTEGER`)
+    // Drafts and re-drafts in flight. An alarm finishes or fails any left behind by a restart.
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS inflight (id TEXT, kind TEXT, started_at INTEGER, attempts INTEGER, PRIMARY KEY (id, kind))`)
     // Clients whose threads the stylist keeps off the stage, including their later messages.
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS hidden_clients (client_id TEXT PRIMARY KEY)`)
     const row = ctx.storage.sql.exec(`SELECT value FROM meta WHERE key = 'stylist'`).toArray()[0]
@@ -123,6 +128,7 @@ export class StylistRoom extends DurableObject<Env> {
       case "reply": return this.reply(body)
       case "reset": return this.reset()
       case "hide": return this.hide(body)
+      case "retry": return this.retry(body)
       default: return new Response("Not found", { status: 404 })
     }
   }
@@ -240,9 +246,13 @@ export class StylistRoom extends DurableObject<Env> {
     return [...parseJsonl(PROFILES[this.stylist!].seedCorrections), ...live]
   }
 
-  private async receiveDm(body: { clientId?: string; text?: string; imageIds?: unknown }) {
+  private async receiveDm(body: { clientId?: string; text?: string; imageIds?: unknown; key?: unknown }) {
     const text = String(body.text ?? "").trim().slice(0, MAX_DM)
     if (!CLIENT_ID.test(String(body.clientId ?? ""))) return Response.json({ error: "Unknown client." }, { status: 400 })
+    // The phone sends a key with each DM, so a retried request never creates the message twice.
+    const key = typeof body.key === "string" && CLIENT_ID.test(body.key) ? body.key : null
+    const existing = key ? this.message(key) : null
+    if (existing) return Response.json({ message: existing.clientId === body.clientId ? clientView(existing) : null })
     // Only photos this phone uploaded can be attached.
     const wanted = Array.isArray(body.imageIds) ? body.imageIds.filter((x): x is string => typeof x === "string").slice(0, MAX_IMAGES_PER_DM) : []
     const images = wanted.filter((id) => this.ctx.storage.sql.exec(`SELECT 1 FROM images WHERE id = ? AND client_id = ?`, id, body.clientId).toArray().length > 0)
@@ -270,7 +280,7 @@ export class StylistRoom extends DurableObject<Env> {
     }
     const draft = roomRecent < DM_PER_ROOM_WINDOW
     const m: RoomMessage = {
-      id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
+      id: key ?? crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
       receivedAt: londonTimestamp(new Date()), text, photoTags: null, images, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
       redrafting: false, editShare: null, sentPrice: null, extra: [],
@@ -281,7 +291,65 @@ export class StylistRoom extends DurableObject<Env> {
     return Response.json({ message: m })
   }
 
+  // Drafting and re-drafting are tracked durably: if this object restarts mid-call, the alarm
+  // retries once, then gives up cleanly, so no message stays "drafting" for ever.
+  private track(id: string, kind: "draft" | "redraft") {
+    this.ctx.storage.sql.exec(`INSERT INTO inflight VALUES (?, ?, ?, 0) ON CONFLICT (id, kind) DO UPDATE SET started_at = excluded.started_at`, id, kind, Date.now())
+    void this.ensureAlarm()
+  }
+
+  private untrack(id: string, kind: "draft" | "redraft") {
+    this.ctx.storage.sql.exec(`DELETE FROM inflight WHERE id = ? AND kind = ?`, id, kind)
+  }
+
+  private async ensureAlarm() {
+    if ((await this.ctx.storage.getAlarm()) == null) await this.ctx.storage.setAlarm(Date.now() + STUCK_MS)
+  }
+
+  async alarm() {
+    const rows = this.ctx.storage.sql.exec(`SELECT id, kind, started_at, attempts FROM inflight`).toArray()
+    const stuck = rows.filter((r) => Number(r.started_at) < Date.now() - STUCK_MS)
+    for (const r of stuck) {
+      const id = String(r.id)
+      const kind = r.kind as "draft" | "redraft"
+      const m = this.message(id)
+      if (!m) { this.untrack(id, kind); continue }
+      if (Number(r.attempts) < 1) {
+        this.ctx.storage.sql.exec(`UPDATE inflight SET attempts = attempts + 1, started_at = ? WHERE id = ? AND kind = ?`, Date.now(), id, kind)
+        if (kind === "draft") await this.draftOnce(m).catch(() => this.failDraft(id))
+        else await this.redraftOnce(id).catch(() => this.failRedraft(id))
+        this.untrack(id, kind)
+      } else {
+        this.untrack(id, kind)
+        if (kind === "draft") this.failDraft(id)
+        else this.failRedraft(id)
+      }
+    }
+    if (this.ctx.storage.sql.exec(`SELECT 1 FROM inflight LIMIT 1`).toArray().length) await this.ctx.storage.setAlarm(Date.now() + STUCK_MS)
+  }
+
+  private failDraft(id: string) {
+    const m = this.message(id)
+    if (m && !m.brief) this.save({ ...m, status: "failed" })
+  }
+
+  private failRedraft(id: string) {
+    const m = this.message(id)
+    if (m?.redrafting) this.save({ ...m, redrafting: false })
+  }
+
   private async draft(m: RoomMessage) {
+    this.track(m.id, "draft")
+    try {
+      await this.draftOnce(m)
+    } catch {
+      this.failDraft(m.id)
+    } finally {
+      this.untrack(m.id, "draft")
+    }
+  }
+
+  private async draftOnce(m: RoomMessage) {
     const { profile, tags } = PROFILES[this.stylist!]
     // Photos are read into tags first (through Mubit, like every model call); the brief model
     // only ever sees the tags, never the image.
@@ -292,7 +360,9 @@ export class StylistRoom extends DurableObject<Env> {
       })
       const read = await readPhotos({ key: this.env.MUBIT_API_KEY, tags: tags as any, photos, fixes: this.readerFixes() }).catch(() => null)
       m = { ...m, photoTags: this.applySimilarFixes(read) }
-      this.save(m)
+      // Merge into the stored message, never overwrite it: it may have changed while we waited
+      // (hidden from the stage, say).
+      this.save({ ...(this.message(m.id) ?? m), photoTags: m.photoTags })
     }
     const used = closestCorrections(m.text, this.correctionPool())
     const dm = { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null }
@@ -329,7 +399,10 @@ export class StylistRoom extends DurableObject<Env> {
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
-    this.save({ ...m, status: brief ? "drafted" : "failed", brief, requestId: result.requestId, ms: result.ms, correctionsUsed: used.length, guarded: stillCleared, baseline })
+    // Same here: only the drafting fields are written onto whatever the message is now.
+    const now = this.message(m.id) ?? m
+    if (now.reply) return // she already answered by hand while this was drafting
+    this.save({ ...now, photoTags: m.photoTags, status: brief ? "drafted" : "failed", brief, requestId: result.requestId, ms: result.ms, correctionsUsed: used.length, guarded: stillCleared, baseline })
   }
 
   private async correct(body: { id?: string; corrected?: Record<string, any> }) {
@@ -370,6 +443,17 @@ export class StylistRoom extends DurableObject<Env> {
   // the corrected example the adapter trains on. Only the reply text is taken from it; the
   // stylist's corrected fields stay exactly as they set them.
   private async redraft(id: string) {
+    this.track(id, "redraft")
+    try {
+      await this.redraftOnce(id)
+    } catch {
+      this.failRedraft(id)
+    } finally {
+      this.untrack(id, "redraft")
+    }
+  }
+
+  private async redraftOnce(id: string) {
     const m = this.message(id)
     if (!m?.corrected) return
     const { profile, tags } = PROFILES[this.stylist!]
@@ -384,9 +468,23 @@ export class StylistRoom extends DurableObject<Env> {
     }).catch(() => null)
     const latest = this.message(id)
     if (!latest?.corrected) return
+    // A newer fix landed while this one was re-drafting: that fix's own re-draft owns the reply.
+    const { reply_draft: _a, ...was } = m.corrected
+    const { reply_draft: _b, ...is } = latest.corrected
+    if (JSON.stringify(was) !== JSON.stringify(is)) return
     const reply = (result?.brief as any)?.reply_draft
     const corrected = typeof reply === "string" ? { ...latest.corrected, reply_draft: reply.replace(/\s*[—–]\s*/g, ", ") } : latest.corrected
     this.save({ ...latest, corrected, redrafting: false })
+  }
+
+  // Drafts a failed message again, when the stylist asks.
+  private retry(body: { id?: string }) {
+    const m = body.id ? this.message(body.id) : null
+    if (!m || m.reply || m.status === "drafting") return Response.json({ error: "Nothing to retry." }, { status: 400 })
+    const again = { ...m, status: "drafting" as const }
+    this.save(again)
+    this.ctx.waitUntil(this.draft(again))
+    return Response.json({ ok: true })
   }
 
   // Keeps one client's thread off the projector (or shows it again). Their chat is unchanged.

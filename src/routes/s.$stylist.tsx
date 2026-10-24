@@ -4,7 +4,7 @@ import { Link, createFileRoute, notFound } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BackIcon, CloseIcon, InfoIcon, PhotoIcon, SendIcon } from '../client/icons.tsx'
 import { isImage, shrinkImage, type Pending } from '../client/images.ts'
-import { clientId, post, uploadImage, useRoom } from '../client/room.ts'
+import { clientId, postRetrying, uploadImage, useRoom } from '../client/room.ts'
 import { MENU, POLICIES, WORK } from '../shared/menu.ts'
 import { STYLISTS, isStylist, type RoomMessage, type StylistKey } from '../shared/stylists.ts'
 
@@ -117,7 +117,8 @@ function ChatPage() {
         setPending((all) => all.map((x) => (x.key === p.key ? { ...x, state: 'uploading' } : x)))
         ids.push(await uploadImage(stylist, me, p.file))
       }
-      const { message } = await post<{ message: RoomMessage }>(stylist, 'dm', { clientId: me, text: body, imageIds: ids })
+      // One key per DM: if the network drops and the send is retried, it still arrives once.
+      const { message } = await postRetrying<{ message: RoomMessage }>(stylist, 'dm', { clientId: me, text: body, imageIds: ids, key: crypto.randomUUID() })
       add(message)
       pending.forEach((p) => URL.revokeObjectURL(p.preview))
       setPending([])

@@ -68,6 +68,7 @@ every resolved date), then scored once on the locked sets.
 | Where | What it owns |
 | --- | --- |
 | `src/server/room.ts` | One Durable Object per stylist: DMs, photos, drafts, fixes, threads, live updates |
+| `src/server/mubit.ts` | Every Mubit call: per-attempt and overall time limits, typed errors (Effect), jittered retries only for rate limits, server errors and timeouts |
 | `src/server/brief-call.ts`, `photo-reader.ts` | The two model calls, both through Mubit |
 | `src/server/brief-prompt.ts` | Her instructions, built only from her profile, so each stylist is one Mubit task |
 | `src/server/guards.ts` | Every field needs a source; settled fields carry through a conversation |
@@ -78,6 +79,13 @@ every resolved date), then scored once on the locked sets.
 | `src/routes/` | The client chat (`s.$stylist`), her inbox (`inbox.$stylist`), the stage |
 | `data/<stylist>/` | Her profile, tag list, seed fixes, voice examples, training DMs and locked test |
 | `scripts/` | Replay and score the locked tests, send training batches, check the data |
+
+## When things go wrong
+
+- **Slow or failing model calls** retry with backoff when it's worth it, and fail fast when it isn't (`scripts/check-mubit-client.ts` proves each case against a misbehaving stand-in).
+- **A restart mid-draft** can't leave a message stuck: drafts in flight are recorded in the room's SQLite, and a Durable Object alarm retries once, then marks the draft failed, where "Try again" and a reply-by-hand box are waiting.
+- **Retried sends** don't duplicate DMs: each one carries a key the room checks.
+- **Overlapping work** doesn't overwrite newer changes: drafts merge into the stored message, and only the newest fix's re-draft is applied.
 
 ## Run it
 

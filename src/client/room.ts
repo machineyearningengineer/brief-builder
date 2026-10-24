@@ -71,6 +71,26 @@ export function useRoom(stylist: StylistKey, auth: RoomAuth | null) {
   return { messages, connected, denied, add }
 }
 
+// Requests that are safe to send again (a DM carries its own key) retry on a dropped connection or
+// a server hiccup, never on a refusal: a 4xx means the request itself needs changing.
+export async function postRetrying<T>(stylist: StylistKey, action: string, body: unknown, token?: string, tries = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await post<T>(stylist, action, body, token)
+    } catch (e) {
+      const status = e instanceof RequestError ? e.status : 0
+      if (i >= tries || (status >= 400 && status < 500)) throw e
+      await new Promise((r) => setTimeout(r, 400 * 2 ** i + Math.random() * 200))
+    }
+  }
+}
+
+export class RequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+  }
+}
+
 export async function post<T>(stylist: StylistKey, action: string, body: unknown, token?: string): Promise<T> {
   const res = await fetch(`/api/room/${stylist}/${action}`, {
     method: 'POST',
@@ -78,7 +98,7 @@ export async function post<T>(stylist: StylistKey, action: string, body: unknown
     body: JSON.stringify(body),
   })
   const data = (await res.json().catch(() => ({}))) as T & { error?: string }
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`)
+  if (!res.ok) throw new RequestError(data.error ?? `Request failed (${res.status})`, res.status)
   return data
 }
 
