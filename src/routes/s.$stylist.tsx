@@ -180,7 +180,8 @@ function ChatPage() {
             ))}
           </div>
         ))}
-        {last && !last.reply && <p className="receipt">Delivered · {time(last.createdAt)}</p>}
+        {/* She reads every reply before it goes, so say when to expect one. */}
+        {last && !last.reply && <p className="receipt">Delivered · {time(last.createdAt)}<br />{info.owner} usually replies within the hour</p>}
         <div ref={end} />
       </main>
 
@@ -285,7 +286,7 @@ const CSS = `
 .photos.n3 img:first-child { grid-column: 1 / -1; }
 .photos img { width: 100%; height: 100%; aspect-ratio: 1; object-fit: cover; background: var(--sunken); }
 .photos.n1 img { aspect-ratio: auto; max-height: 420px; }
-.receipt { align-self: flex-end; color: var(--faint); font-size: 12px; margin: 0 4px 4px; }
+.receipt { align-self: flex-end; text-align: right; color: var(--faint); font-size: 12px; line-height: 1.5; margin: 0 4px 4px; }
 .dm-compose { padding: 6px max(10px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 6px) max(10px, env(safe-area-inset-left)); background: var(--bg); display: grid; gap: 6px; }
 .tray { display: flex; gap: 8px; padding: 4px 4px 0; overflow-x: auto; }
 .thumb { position: relative; margin: 0; width: 64px; height: 64px; flex: none; border-radius: 12px; overflow: hidden; }
