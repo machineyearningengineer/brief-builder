@@ -7,6 +7,7 @@ import mubit from '../shared/mubit-status.json'
 import type { RoomMessage } from '../shared/stylists.ts'
 import { Qr } from '../client/qr.tsx'
 import { Tip } from '../client/tip.tsx'
+import { closestYes } from '../shared/pricing.ts'
 import braiderProfile from '../../data/braider/profile.json'
 import colouristProfile from '../../data/colourist/profile.json'
 import nailsProfile from '../../data/nails/profile.json'
@@ -215,6 +216,8 @@ function Latest({ m, booking, photo, stylist, token, first }: { m: RoomMessage; 
   const get = (o: any, path: string) => path.split('.').reduce((v, k) => v?.[k], o)
   const facts = brief ? fields.map((path) => ({ path, now: get(brief, path), was: m.changed.includes(path) ? get(m.brief, path) : undefined }))
     .filter((f) => f.now && f.now !== 'unknown') : []
+  // A no shows in amber, with the closest yes from her price list beside it.
+  const nearest = brief && !m.reply ? closestYes(stylist, brief) : null
   const original = m.brief?.reply_draft
   const fixedReply = m.corrected && !m.redrafting && original && brief?.reply_draft !== original
   const drafting = m.status === 'drafting' || (!brief && m.status !== 'failed')
@@ -233,8 +236,10 @@ function Latest({ m, booking, photo, stylist, token, first }: { m: RoomMessage; 
                 </li>
               ))}
               <li className="next pop" key={`next-${brief.next_action}`}>{say(brief.next_action)}</li>
+              {nearest && <li className="no pop">{nearest.why}</li>}
             </ul>
           )}
+          {nearest && <p className="yes arrive">Closest yes: {nearest.label}{nearest.amount != null && <b> · £{nearest.amount}</b>}</p>}
         </div>
       </div>
       {m.status === 'failed' && !m.reply && <p className="muted">No draft this time. {first} is replying by hand.</p>}
@@ -357,6 +362,8 @@ const STAGE_CSS = `
 .facts { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .facts li { padding: 6px 12px; border-radius: 99px; background: var(--sunken); font-size: 16px; font-weight: 600; }
 .facts .next { background: var(--accent); color: var(--on-accent); }
+.facts .no { background: var(--warn-soft); color: var(--warn); outline: 1.5px solid var(--warn); }
+.yes { margin: 10px 0 0; font-size: 17px; color: var(--accent); font-weight: 600; }
 .facts .changed { background: var(--good-soft); color: var(--good); outline: 1.5px solid var(--good); display: inline-flex; gap: 6px; align-items: baseline; }
 .facts .changed s { color: var(--muted); font-weight: 500; }
 mark.new { background: var(--good-soft); color: var(--good); font-weight: 700; border-radius: 4px; padding: 0 3px; }

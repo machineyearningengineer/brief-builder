@@ -58,7 +58,8 @@ export function estimate(stylist: StylistKey, brief: Record<string, any> | null)
 // When the answer is no, the nearest thing she can say yes to, from her own price list.
 // Over budget: the fewest, smallest changes that fit. A service she doesn't do: the one she
 // offers instead. Health and age referrals have no closest yes on purpose.
-export type ClosestYes = { label: string; amount: number | null; change: Record<string, unknown> }
+// why: what the no is, in her words, so the screens can show it before offering the yes.
+export type ClosestYes = { label: string; amount: number | null; change: Record<string, unknown>; why: string }
 
 const set = (o: any, path: string, v: unknown) => {
   const keys = path.split('.')
@@ -72,9 +73,9 @@ const apply = (brief: Record<string, any>, change: Record<string, unknown>) => {
 }
 const words = (v: string) => v.replaceAll('_', ' ')
 
-const INSTEAD: Partial<Record<StylistKey, Record<string, { service: string; why: string }>>> = {
-  braider: { wig_install: { service: 'sew_in', why: 'A sew-in instead of a wig install' } },
-  colourist: { colour_correction: { service: 'colour_correction', why: 'Free 15-minute consultation first' } },
+const INSTEAD: Partial<Record<StylistKey, Record<string, { service: string; why: string; no: string }>>> = {
+  braider: { wig_install: { service: 'sew_in', why: 'A sew-in instead of a wig install', no: 'She doesn’t do wig installs' } },
+  colourist: { colour_correction: { service: 'colour_correction', why: 'Free 15-minute consultation first', no: 'No price for colour correction before a consultation' } },
 }
 
 function candidates(stylist: StylistKey, brief: Record<string, any>): Record<string, unknown>[] {
@@ -139,7 +140,7 @@ export function closestYes(stylist: StylistKey, brief: Record<string, any> | nul
   const instead = INSTEAD[stylist]?.[brief.service]
   if (instead && (brief.next_action === 'decline' || brief.next_action === 'refer' || instead.service !== brief.service)) {
     const change = { service: instead.service, next_action: instead.service === brief.service ? 'ask' : 'quote' }
-    return { label: instead.why, amount: estimate(stylist, apply(brief, change))?.amount ?? null, change }
+    return { label: instead.why, amount: estimate(stylist, apply(brief, change))?.amount ?? null, change, why: instead.no }
   }
   const budget = brief.budget_max_gbp
   const now = estimate(stylist, brief)
@@ -151,5 +152,5 @@ export function closestYes(stylist: StylistKey, brief: Record<string, any> | nul
     .sort((a, b) => cost(a.change) - cost(b.change) || b.amount - a.amount)
   const best = fits[0]
   if (!best) return null
-  return { label: `Within £${budget}: ${describe(best.change, brief)}`, amount: best.amount, change: best.change }
+  return { label: `Within £${budget}: ${describe(best.change, brief)}`, amount: best.amount, change: best.change, why: `£${now.amount}, over the £${budget} budget` }
 }

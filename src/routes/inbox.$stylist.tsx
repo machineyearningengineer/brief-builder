@@ -446,6 +446,7 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
                 </select>
               </label>
               {price && <p className="price"><b>{price.from ? 'from ' : ''}£{price.amount}</b>{price.note && <span className="muted"> · {price.note}</span>}</p>}
+              {nearest && !m.reply && <p className="no-line">{nearest.why}</p>}
               {nearest && !m.reply && (
                 <div className="nearest rise">
                   <span><small className="eyebrow">Closest yes</small><span>{nearest.label}</span>{nearest.amount != null && <b>£{nearest.amount}</b>}</span>
@@ -689,6 +690,7 @@ const CSS = `
 .seg button:hover { border-color: var(--faint); color: var(--ink); }
 .seg button.on { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
 .line.fixed .seg button.on { background: var(--good); border-color: var(--good); color: var(--bg); }
+.no-line { margin: 8px 0 0; padding: 6px 10px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-weight: 600; font-size: 14px; width: fit-content; }
 .nearest { margin-top: 10px; padding: 12px 14px; border: 1px dashed var(--accent); border-radius: var(--radius); display: flex; gap: 12px; align-items: center; justify-content: space-between; }
 .nearest span { display: grid; gap: 2px; min-width: 0; }
 .nearest .btn { white-space: nowrap; flex: none; }

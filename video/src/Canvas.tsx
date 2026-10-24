@@ -161,18 +161,32 @@ function Voiced({ text }: { text: string }) {
 function Ripple() {
   const f = useCurrentFrame()
   const draw = (from: number, to: number) => interpolate(f, [from, to], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) })
+  // One clean route, no crossings: a rounded bracket from the size row down to the price, and a
+  // straight branch from its top corner into the reply card. Dots mark where it lands.
+  const edge = SHEET.x + SHEET.w
+  const rail = edge + 34
+  const r = 14
   const sizeY = rowY(2) + ROW / 2
   const priceY = rowY(5) + 52
   const segs = [
-    { d: `M ${SHEET.x + SHEET.w - 6} ${sizeY} C ${SHEET.x + SHEET.w + 60} ${sizeY}, ${SHEET.x + SHEET.w + 60} ${priceY}, ${SHEET.x + SHEET.w - 6} ${priceY}`, p: draw(TAP + 8, TAP + 40) },
-    { d: `M ${SHEET.x + SHEET.w + 40} ${(sizeY + priceY) / 2} C ${SHEET.x + SHEET.w + 70} ${(sizeY + priceY) / 2}, 1250 300, 1290 300`, p: draw(TAP + 40, TAP + 70) },
-    { d: `M ${SHEET.x + SHEET.w / 2} ${SHEET.y + 640} C ${SHEET.x + SHEET.w / 2} 900, ${SHEET.x + SHEET.w / 2} 1040, ${SHEET.x + SHEET.w / 2} 1170`, p: draw(745, 800) },
+    { d: `M ${edge} ${sizeY} H ${rail - r} Q ${rail} ${sizeY} ${rail} ${sizeY + r} V ${priceY - r} Q ${rail} ${priceY} ${rail - r} ${priceY} H ${edge}`, p: draw(TAP + 8, TAP + 40) },
+    { d: `M ${rail} ${sizeY} H 1290`, p: draw(TAP + 40, TAP + 62) },
+    { d: `M ${SHEET.x + SHEET.w / 2} ${SHEET.y + 640} V 1170`, p: draw(745, 800) },
+  ]
+  const dots = [
+    { x: edge, y: priceY, at: TAP + 40 },
+    { x: 1290, y: sizeY, at: TAP + 62 },
+    { x: SHEET.x + SHEET.w / 2, y: 1170, at: 800 },
   ]
   return (
-    <svg style={{ position: "absolute", left: 0, top: 0, overflow: "visible", filter: `drop-shadow(0 0 10px ${t.accent})` }} width={2400} height={1800}>
+    <svg style={{ position: "absolute", left: 0, top: 0, overflow: "visible", filter: `drop-shadow(0 0 8px ${t.accent})` }} width={2400} height={1800}>
       {segs.map((s, i) => (
-        <path key={i} d={s.d} pathLength={1} fill="none" stroke={t.accent} strokeWidth={5} strokeLinecap="round" strokeDasharray="1 1" strokeDashoffset={1 - s.p} opacity={s.p > 0 ? 1 : 0} />
+        <path key={i} d={s.d} pathLength={1} fill="none" stroke={t.accent} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1 1" strokeDashoffset={1 - s.p} opacity={s.p > 0 ? 1 : 0} />
       ))}
+      {dots.map((d, i) => {
+        const p = interpolate(f, [d.at, d.at + 10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.out(Easing.back(2)) })
+        return <circle key={i} cx={d.x} cy={d.y} r={7 * p} fill={t.accent} />
+      })}
     </svg>
   )
 }
