@@ -88,6 +88,9 @@ export class StylistRoom extends DurableObject<Env> {
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS inflight (id TEXT, kind TEXT, started_at INTEGER, attempts INTEGER, PRIMARY KEY (id, kind))`)
     // Clients whose threads the stylist keeps off the stage, including their later messages.
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS hidden_clients (client_id TEXT PRIMARY KEY)`)
+    // Private pages for the control page, such as the demo map. Kept out of the public repo and
+    // out of reach of a reset.
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS docs (name TEXT PRIMARY KEY, html TEXT, updated_at INTEGER)`)
     const row = ctx.storage.sql.exec(`SELECT value FROM meta WHERE key = 'stylist'`).toArray()[0]
     if (row) this.stylist = row.value as StylistKey
   }
@@ -119,6 +122,7 @@ export class StylistRoom extends DurableObject<Env> {
       if (!CLIENT_ID.test(client)) return new Response("Unknown client", { status: 401 })
       return Response.json({ messages: this.messages().filter((m) => m.clientId === client).map(clientView) })
     }
+    if (action === "doc") return this.doc(request, itemId ?? "", isStylist)
     if (action === "image" && request.method === "GET") return this.serveImage(itemId ?? "", isStylist, client)
     if (action === "image" && request.method === "POST") return this.receiveImage(request, client)
     if (request.method !== "POST") return new Response("Not found", { status: 404 })
@@ -589,6 +593,20 @@ export class StylistRoom extends DurableObject<Env> {
     return new Response(r.bytes as ArrayBuffer, {
       headers: { "content-type": r.mime as string, "cache-control": "private, max-age=3600", "x-content-type-options": "nosniff" },
     })
+  }
+
+  private async doc(request: Request, name: string, isStylist: boolean) {
+    if (!isStylist) return new Response("Only the stylist can do that.", { status: 401 })
+    if (!/^[a-z0-9-]{1,40}$/.test(name)) return new Response("Not found", { status: 404 })
+    if (request.method === "PUT") {
+      const html = await request.text()
+      if (!html || html.length > 1_000_000) return new Response("Expected a page under 1 MB", { status: 400 })
+      this.ctx.storage.sql.exec(`INSERT OR REPLACE INTO docs (name, html, updated_at) VALUES (?, ?, ?)`, name, html, Date.now())
+      return Response.json({ ok: true })
+    }
+    const row = this.ctx.storage.sql.exec(`SELECT html, updated_at FROM docs WHERE name = ?`, name).toArray()[0]
+    if (!row) return new Response("Not found", { status: 404 })
+    return new Response(row.html as string, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-updated-at": String(row.updated_at) } })
   }
 
   private reset() {

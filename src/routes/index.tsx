@@ -84,6 +84,7 @@ function Home() {
 
       <footer className="foot">
         <Link to="/stage">Stage</Link>
+        <Link to="/control">Control</Link>
         <a href="https://github.com/machineyearningengineer/brief-builder">Code on GitHub</a>
       </footer>
       <style>{CSS}</style>

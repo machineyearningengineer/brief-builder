@@ -46,8 +46,8 @@ function Noise() {
       <div style={{ position: "absolute", left: 860, top: 330, width: 900 }}>
         <Caption at={40}>Every night, the same DMs.</Caption>
         <Rise at={120} style={{ marginTop: 34 }}>
-          <p style={{ margin: 0, fontSize: 38, lineHeight: 1.3, color: t.muted, maxWidth: 820 }}>
-            A photo and three words. Before anything gets booked, she has to ask what they want, explain the price and find a time.
+          <p style={{ margin: 0, fontSize: 38, lineHeight: 1.3, color: t.muted, maxWidth: 820, textWrap: "balance" }}>
+            Each one needs a back-and-forth before it’s a booking: the style, the price, the day.
           </p>
         </Rise>
       </div>
