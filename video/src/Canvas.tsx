@@ -161,8 +161,8 @@ function Voiced({ text }: { text: string }) {
 function Ripple() {
   const f = useCurrentFrame()
   const draw = (from: number, to: number) => interpolate(f, [from, to], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic) })
-  // One clean route, no crossings: a rounded bracket from the size row down to the price, and a
-  // straight branch from its top corner into the reply card. Dots mark where it lands.
+  // One clean route, no crossings: a rounded bracket from the size row down to the price, and one
+  // straight line from the size row into the reply card that the bracket curves off. Dots mark where it lands.
   const edge = SHEET.x + SHEET.w
   const rail = edge + 34
   const r = 14
@@ -170,7 +170,7 @@ function Ripple() {
   const priceY = rowY(5) + 52
   const segs = [
     { d: `M ${edge} ${sizeY} H ${rail - r} Q ${rail} ${sizeY} ${rail} ${sizeY + r} V ${priceY - r} Q ${rail} ${priceY} ${rail - r} ${priceY} H ${edge}`, p: draw(TAP + 8, TAP + 40) },
-    { d: `M ${rail} ${sizeY} H 1290`, p: draw(TAP + 40, TAP + 62) },
+    { d: `M ${edge} ${sizeY} H 1290`, p: draw(TAP + 30, TAP + 62) },
     { d: `M ${SHEET.x + SHEET.w / 2} ${SHEET.y + 640} V 1170`, p: draw(745, 800) },
   ]
   const dots = [

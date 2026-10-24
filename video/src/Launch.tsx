@@ -5,7 +5,7 @@ import capture from "./capture.json"
 import { adapters, checkedAt, inboxNoise, publicNailCard, scores, sideBySide, stylists } from "./data.ts"
 import { Avatar, Bubble, Caption, Card, Count, Eyebrow, Phone, Rise, Scene, t, useRise } from "./ui.tsx"
 
-export const SCENES = { noise: 210, title: 120, canvas: CANVAS_FRAMES, closest: CLOSEST_FRAMES, thread: 270, learn: 450, mubit: 360, stylists: 270, close: 210 }
+export const SCENES = { noise: 210, title: 120, canvas: CANVAS_FRAMES, closest: CLOSEST_FRAMES, thread: 300, learn: 450, mubit: 360, stylists: 270, close: 210 }
 export const REAL_FRAMES = 760
 export const TOTAL = Object.values(SCENES).reduce((a, b) => a + b, 0)
 
@@ -89,13 +89,13 @@ function Thread() {
           <Bubble side="out" at={-30} photo="knotless.webp" />
           <Bubble side="out" at={-30}>{capture.hero.dm}</Bubble>
           <Bubble side="in" at={-30}>{capture.hero.fixedReply}</Bubble>
-          <Bubble side="out" at={40}>{capture.followUp.dm}</Bubble>
-          <Typing from={70} to={120} />
-          <Bubble side="in" at={120}>{capture.followUp.reply}</Bubble>
+          <Bubble side="out" at={50}>{capture.followUp.dm}</Bubble>
+          <Typing from={85} to={140} />
+          <Bubble side="in" at={140}>{capture.followUp.reply}</Bubble>
         </Phone>
       </div>
       <div style={{ position: "absolute", left: 160, top: 380, width: 880 }}>
-        <Caption at={20} sub="The size she fixed, the price and the photo carry through every follow-up. A change needs the client to say so.">The conversation keeps going.</Caption>
+        <Caption at={20} sub="It still knows the photo, her fix and the price. Nothing changes unless the client asks.">The conversation keeps going.</Caption>
       </div>
     </Scene>
   )
@@ -264,10 +264,10 @@ function Close() {
     <Scene frames={SCENES.close}>
       <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", textAlign: "center" }}>
         <div>
-          <Rise at={10}><div style={{ fontSize: 56, color: t.muted, fontStyle: "italic" }}>“can u do these?”</div></Rise>
-          <Rise at={62}><div style={{ fontFamily: t.display, fontWeight: 750, fontSize: 190, letterSpacing: "-0.04em", lineHeight: 1, color: t.accent, marginTop: 18 }}>Booked.</div></Rise>
-          <Rise at={100} style={{ marginTop: 56 }}><div style={{ fontFamily: t.display, fontWeight: 700, fontSize: 48, letterSpacing: "-0.02em" }}>Brief Builder</div></Rise>
-          <Rise at={118} style={{ marginTop: 12, fontSize: 24, color: t.faint }}>brief-builder.buy-ea2.workers.dev · every model call through Mubit</Rise>
+          <Rise at={18}><div style={{ fontSize: 56, color: t.muted, fontStyle: "italic" }}>“can u do these?”</div></Rise>
+          <Rise at={74}><div style={{ fontFamily: t.display, fontWeight: 750, fontSize: 190, letterSpacing: "-0.04em", lineHeight: 1, color: t.accent, marginTop: 18 }}>Booked.</div></Rise>
+          <Rise at={108} style={{ marginTop: 56 }}><div style={{ fontFamily: t.display, fontWeight: 700, fontSize: 48, letterSpacing: "-0.02em" }}>Brief Builder</div></Rise>
+          <Rise at={126} style={{ marginTop: 12, fontSize: 24, color: t.faint }}>brief-builder.buy-ea2.workers.dev · every model call through Mubit</Rise>
         </div>
       </div>
     </Scene>

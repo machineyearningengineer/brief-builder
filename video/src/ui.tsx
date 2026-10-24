@@ -92,7 +92,8 @@ export function Phone({ children, title, sub, style }: { children: ReactNode; ti
             {sub && <div style={{ fontSize: 16, color: t.muted }}>{sub}</div>}
           </div>
         </div>
-        <div style={{ flex: 1, padding: "20px 18px", display: "flex", flexDirection: "column", gap: 10, justifyContent: "flex-end" }}>{children}</div>
+        {/* Like a real chat: the newest message stays in view and older ones scroll off the top. */}
+        <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", padding: "20px 18px", display: "flex", flexDirection: "column", gap: 10, justifyContent: "flex-end" }}>{children}</div>
       </div>
     </div>
   )
