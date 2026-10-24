@@ -1,0 +1,17 @@
+[
+  { "at": 0.6, "text": "This is Amara. She braids hair in Peckham, and every night her DMs look like this." },
+  { "at": 7.4, "text": "Brief Builder turns them into bookings." },
+  { "at": 11.4, "text": "A client sends a photo and four words." },
+  { "at": 15.6, "text": "It reads the photo, prices it from Amara's own list, and drafts the reply." },
+  { "at": 23.0, "text": "The photo says medium. Amara can tell it's more of a smedium. One tap." },
+  { "at": 29.0, "text": "The price moves, the reply rewrites itself, and that fix goes with every draft after it." },
+  { "at": 37.0, "text": "So the next person with the same photo gets it right first time." },
+  { "at": 43.0, "text": "It picks up how she talks, too. She rewrote one draft last week." },
+  { "at": 48.6, "text": "Now every draft opens with hiya lovely. Heart included. Kiss included." },
+  { "at": 54.4, "text": "When the answer is no, it looks for the closest yes. Over budget? Bigger braids, same length, and it still comes in under a hundred and fifty." },
+  { "at": 66.4, "text": "Follow-ups keep the thread, so nobody has to explain themselves twice." },
+  { "at": 75.4, "text": "We tested it on sixty messages it had never seen. On its own, the model got thirty percent fully right. With her fixes and her rules, seventy-two." },
+  { "at": 90.4, "text": "Every call goes through Mubit, which keeps her fixes as training data for a model of her own." },
+  { "at": 102.4, "text": "Lou does colour. Jade does nails. Same app, their own prices, their own voice." },
+  { "at": 111.4, "text": "Brief Builder. From \"can u do these\" to booked." }
+]
