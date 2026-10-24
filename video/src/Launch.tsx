@@ -1,11 +1,11 @@
 // The submission film: problem, product, the fix, the learning, Mubit, three stylists, close.
-import { AbsoluteFill, Img, Series, interpolate, staticFile, useCurrentFrame } from "remotion"
+import { AbsoluteFill, Img, OffthreadVideo, Series, interpolate, staticFile, useCurrentFrame } from "remotion"
 import { CANVAS_FRAMES, CLOSEST_FRAMES, ClosestYesScene, InboxCanvas } from "./Canvas.tsx"
 import capture from "./capture.json"
 import { adapters, checkedAt, inboxNoise, publicNailCard, scores, sideBySide, stylists } from "./data.ts"
 import { Avatar, Bubble, Caption, Card, Count, Eyebrow, Phone, Rise, Scene, t, useRise } from "./ui.tsx"
 
-export const SCENES = { noise: 210, title: 120, canvas: CANVAS_FRAMES, closest: CLOSEST_FRAMES, thread: 270, learn: 450, mubit: 360, stylists: 270, close: 210 }
+export const SCENES = { noise: 210, title: 120, canvas: CANVAS_FRAMES, closest: CLOSEST_FRAMES, thread: 270, learn: 450, mubit: 360, stylists: 270, real: 690, close: 210 }
 export const TOTAL = Object.values(SCENES).reduce((a, b) => a + b, 0)
 
 export function Launch({ publicSafe = false }: { publicSafe?: boolean }) {
@@ -20,6 +20,7 @@ export function Launch({ publicSafe = false }: { publicSafe?: boolean }) {
         <Series.Sequence durationInFrames={SCENES.learn}><Learn /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.mubit}><Mubit /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.stylists}><Stylists publicSafe={publicSafe} /></Series.Sequence>
+        <Series.Sequence durationInFrames={SCENES.real}><RealApp /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.close}><Close /></Series.Sequence>
       </Series>
     </AbsoluteFill>
@@ -236,6 +237,20 @@ function Stylists({ publicSafe }: { publicSafe: boolean }) {
           </Rise>
         ))}
       </div>
+    </Scene>
+  )
+}
+
+// Real footage of the live app, recorded from the stage during an end-to-end run, at double speed.
+function RealApp() {
+  return (
+    <Scene frames={SCENES.real}>
+      <div style={{ position: "absolute", left: 120, top: 70 }}><Caption at={0}>This is the real app, live.</Caption></div>
+      <Rise at={10} style={{ position: "absolute", left: 240, top: 210, width: 1440, height: 810 }}>
+        <div style={{ width: "100%", height: "100%", borderRadius: 24, overflow: "hidden", boxShadow: "0 40px 120px oklch(0% 0 0 / 0.55)", border: `1px solid ${t.line}` }}>
+          <OffthreadVideo src={staticFile("stage-live.mp4")} playbackRate={2} trimBefore={60} muted style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
+        </div>
+      </Rise>
     </Scene>
   )
 }

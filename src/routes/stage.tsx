@@ -75,7 +75,10 @@ function Stage() {
     setToken(stylistToken.get())
     setOrigin(location.origin)
   }, [])
-  const { messages: all, connected } = useRoom(stylist, token ? { token } : null)
+  const { messages: all, connected, denied } = useRoom(stylist, token ? { token } : null)
+  const [askKey, setAskKey] = useState(false)
+  const status = !token || denied ? 'off' : connected ? 'live' : 'reconnecting'
+  const showConnect = status === 'off' || askKey
   // Threads she hid from the projector never show here.
   const messages = all.filter((m) => !m.hidden)
   const latest = messages.at(-1)
@@ -90,7 +93,10 @@ function Stage() {
     <main className="stage">
       <nav className="top" aria-label="Stylist">
         <Link to="/" className="mark">Brief Builder</Link>
-        <span className={connected ? 'dot on' : 'dot'} title={connected ? 'Live' : 'Connecting'} />
+        <button className={`pill ${status}`} onClick={() => { setAskKey(true); setTimeout(() => document.getElementById('stage-key')?.focus(), 0) }} aria-live="polite">
+          <i aria-hidden="true" />
+          {status === 'live' ? 'Live' : status === 'reconnecting' ? 'Reconnecting…' : 'Offline'}
+        </button>
         <div className="switch">
           {(Object.keys(STYLISTS) as StylistKey[]).map((s) => (
             <button key={s} className={s === stylist ? 'btn primary' : 'btn'} onClick={() => setStylist(s)} aria-pressed={s === stylist} aria-label={STYLISTS[s].name}>
@@ -108,9 +114,9 @@ function Stage() {
       </section>
 
       <section className="room" aria-live="polite">
-        {!token && (
-          <form className="connect" onSubmit={(e) => { e.preventDefault(); stylistToken.set(draftKey.trim()); setToken(draftKey.trim()) }}>
-            <label htmlFor="stage-key">Enter the stylist key to show DMs live</label>
+        {showConnect && (
+          <form className="connect" onSubmit={(e) => { e.preventDefault(); stylistToken.set(draftKey.trim()); setToken(draftKey.trim()); setAskKey(false); setDraftKey('') }}>
+            <label htmlFor="stage-key">{denied ? 'That key didn’t work. Paste the stylist key again.' : 'Enter the stylist key to show DMs live'}</label>
             <span>
               <input id="stage-key" type="password" autoComplete="off" placeholder="Stylist key" value={draftKey} onChange={(e) => setDraftKey(e.target.value)} />
               <button className="btn primary" type="submit" disabled={!draftKey.trim()}>Connect</button>
@@ -204,8 +210,13 @@ function Model({ adapter, first, fixes }: { adapter?: Adapter; first: string; fi
 
 function Latest({ m, photo, stylist, token, first }: { m: RoomMessage; photo?: string; stylist: StylistKey; token: string; first: string }) {
   const brief = m.corrected ?? m.brief
-  const facts = brief ? [brief.service, brief.look?.length, brief.look?.size ?? brief.look?.shade, brief.look?.shape, brief.look?.finish]
-    .filter((v) => v && v !== 'unknown').map(say) : []
+  // Each chip knows its field, so a field she fixed can show what it was.
+  const fields = ['service', 'look.length', brief?.look?.size !== undefined ? 'look.size' : 'look.shade', 'look.shape', 'look.finish']
+  const get = (o: any, path: string) => path.split('.').reduce((v, k) => v?.[k], o)
+  const facts = brief ? fields.map((path) => ({ path, now: get(brief, path), was: m.changed.includes(path) ? get(m.brief, path) : undefined }))
+    .filter((f) => f.now && f.now !== 'unknown') : []
+  const original = m.brief?.reply_draft
+  const fixedReply = m.corrected && !m.redrafting && original && brief?.reply_draft !== original
   const drafting = m.status === 'drafting' || (!brief && m.status !== 'failed')
   return (
     // Keyed by message only: the card rises once, and each state change animates its own part.
@@ -216,7 +227,11 @@ function Latest({ m, photo, stylist, token, first }: { m: RoomMessage; photo?: s
           {m.text && <p className="text">“{m.text}”</p>}
           {brief && (
             <ul className="facts">
-              {facts.map((f) => <li key={f} className="pop">{f}</li>)}
+              {facts.map((f) => (
+                <li key={`${f.path}-${f.now}`} className={f.was !== undefined ? 'pop changed' : 'pop'}>
+                  {f.was !== undefined && f.was !== 'unknown' && <s>{say(f.was)}</s>}{say(f.now)}
+                </li>
+              ))}
               <li className="next pop" key={`next-${brief.next_action}`}>{say(brief.next_action)}</li>
             </ul>
           )}
@@ -236,13 +251,24 @@ function Latest({ m, photo, stylist, token, first }: { m: RoomMessage; photo?: s
           ) : (
             <div className={m.redrafting ? 'side ours busy' : 'side ours'}>
               <b>{m.redrafting ? `Re-drafting with ${first}’s fix` : `${first}’s draft`}{m.redrafting && <span className="dots"><i /><i /><i /></span>}</b>
-              <p className="arrive glow" key={brief.reply_draft}>{brief.reply_draft}</p>
+              <p className="arrive glow" key={brief.reply_draft}>{fixedReply ? <Changed before={original} after={brief.reply_draft} values={facts.filter((f) => f.was !== undefined).map((f) => say(f.now))} /> : brief.reply_draft}</p>
             </div>
           )}
         </div>
       )}
     </div>
   )
+}
+
+// The new draft with only what her fix moved picked out: the new values and any new price.
+function Changed({ before, after, values }: { before: string; after: string; values: string[] }) {
+  const oldPrices = new Set(before.match(/£\d+/g) ?? [])
+  const words = values.flatMap((v) => v.toLowerCase().split(/[\s-]+/)).filter((w) => w.length > 2)
+  const parts = after.split(/(£\d+|[A-Za-z][A-Za-z-]*)/)
+  return <>{parts.map((p, k) => {
+    const hit = (/^£\d+$/.test(p) && !oldPrices.has(p)) || words.includes(p.toLowerCase())
+    return hit ? <mark key={k} className="new">{p}</mark> : <span key={k}>{p}</span>
+  })}</>
 }
 
 // How much of each draft she rewrote before sending, oldest to newest.
@@ -291,8 +317,13 @@ const STAGE_CSS = `
 .top { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
 .mark { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; color: var(--ink); text-decoration: none; }
 .mark:hover { color: var(--accent); }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
-.dot.on { background: var(--good); }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--line); background: transparent; font-size: 13px; font-weight: 600; color: var(--muted); }
+.pill i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.pill.live { color: var(--good); border-color: color-mix(in oklch, var(--good) 40%, transparent); }
+.pill.reconnecting { color: oklch(72% 0.15 75); border-color: color-mix(in oklch, oklch(72% 0.15 75) 40%, transparent); }
+.pill.off { color: var(--bad); border-color: color-mix(in oklch, var(--bad) 45%, transparent); }
+@media (prefers-reduced-motion: no-preference) { .pill.reconnecting i { animation: blink 1.2s infinite; } .pill.live i { animation: breathe 2.4s var(--ease) infinite; } }
+@keyframes breathe { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--good) 50%, transparent); } 50% { box-shadow: 0 0 0 5px transparent; } }
 .switch { margin-left: auto; display: grid; grid-template-columns: repeat(3, minmax(96px, 1fr)); gap: 4px; padding: 4px; border-radius: 99px; background: var(--sunken); }
 .switch .btn { border: 0; background: transparent; padding: 9px 18px; white-space: nowrap; }
 .switch .btn.primary { background: var(--accent); }
@@ -317,6 +348,9 @@ const STAGE_CSS = `
 .facts { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .facts li { padding: 6px 12px; border-radius: 99px; background: var(--sunken); font-size: 16px; font-weight: 600; }
 .facts .next { background: var(--accent); color: var(--on-accent); }
+.facts .changed { background: var(--good-soft); color: var(--good); outline: 1.5px solid var(--good); display: inline-flex; gap: 6px; align-items: baseline; }
+.facts .changed s { color: var(--muted); font-weight: 500; }
+mark.new { background: var(--good-soft); color: var(--good); font-weight: 700; border-radius: 4px; padding: 0 3px; }
 .versus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .side { border-radius: 18px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
 .side b { font-size: 14px; }
