@@ -38,6 +38,8 @@ export type RoomMessage = {
   sentPrice: number | null
   // Messages she sent after the reply, such as a price correction.
   extra: string[]
+  // Kept off the projector: the stylist hid this client's thread from the stage.
+  hidden: boolean
 }
 
 export type RoomEvent = { type: "message"; message: RoomMessage } | { type: "reset" }

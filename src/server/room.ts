@@ -49,7 +49,7 @@ const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 // What a client's phone may see of a message: their words, its status and the stylist's reply.
 const clientView = (m: RoomMessage): RoomMessage => ({
   ...m, photoTags: null, brief: null, corrected: null, changed: [], requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null, redrafting: false,
-  editShare: null, sentPrice: null,
+  editShare: null, sentPrice: null, hidden: false,
 })
 
 export class StylistRoom extends DurableObject<Env> {
@@ -78,6 +78,9 @@ export class StylistRoom extends DurableObject<Env> {
     if (!cols.includes("edit_share")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN edit_share REAL`)
     if (!cols.includes("sent_price")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN sent_price INTEGER`)
     if (!cols.includes("extra")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN extra TEXT`)
+    if (!cols.includes("hidden")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN hidden INTEGER`)
+    // Clients whose threads the stylist keeps off the stage, including their later messages.
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS hidden_clients (client_id TEXT PRIMARY KEY)`)
     const row = ctx.storage.sql.exec(`SELECT value FROM meta WHERE key = 'stylist'`).toArray()[0]
     if (row) this.stylist = row.value as StylistKey
   }
@@ -119,6 +122,7 @@ export class StylistRoom extends DurableObject<Env> {
       case "correct": return this.correct(body)
       case "reply": return this.reply(body)
       case "reset": return this.reset()
+      case "hide": return this.hide(body)
       default: return new Response("Not found", { status: 404 })
     }
   }
@@ -163,10 +167,10 @@ export class StylistRoom extends DurableObject<Env> {
   private save(m: RoomMessage) {
     this.ctx.storage.sql.exec(
       `INSERT OR REPLACE INTO messages (id, client_id, created_at, received_at, text, photo, status, brief, corrected, changed,
-        reply, request_id, ms, corrections_used, guarded, images, baseline, redrafting, edit_share, sent_price, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reply, request_id, ms, corrections_used, guarded, images, baseline, redrafting, edit_share, sent_price, extra, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       m.id, m.clientId, m.createdAt, m.receivedAt, m.text, JSON.stringify(m.photoTags), m.status, JSON.stringify(m.brief),
       JSON.stringify(m.corrected), JSON.stringify(m.changed), m.reply, m.requestId, m.ms, m.correctionsUsed, JSON.stringify(m.guarded),
-      JSON.stringify(m.images), JSON.stringify(m.baseline), m.redrafting ? 1 : 0, m.editShare, m.sentPrice, JSON.stringify(m.extra ?? []),
+      JSON.stringify(m.images), JSON.stringify(m.baseline), m.redrafting ? 1 : 0, m.editShare, m.sentPrice, JSON.stringify(m.extra ?? []), m.hidden ? 1 : 0,
     )
     this.broadcast({ type: "message", message: m })
   }
@@ -270,6 +274,7 @@ export class StylistRoom extends DurableObject<Env> {
       receivedAt: londonTimestamp(new Date()), text, photoTags: null, images, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
       redrafting: false, editShare: null, sentPrice: null, extra: [],
+      hidden: this.ctx.storage.sql.exec(`SELECT 1 FROM hidden_clients WHERE client_id = ?`, body.clientId).toArray().length > 0,
     }
     this.save(m)
     if (draft) this.ctx.waitUntil(this.draft(m))
@@ -384,6 +389,17 @@ export class StylistRoom extends DurableObject<Env> {
     this.save({ ...latest, corrected, redrafting: false })
   }
 
+  // Keeps one client's thread off the projector (or shows it again). Their chat is unchanged.
+  private hide(body: { clientId?: string; hidden?: boolean }) {
+    const client = String(body.clientId ?? "")
+    if (!CLIENT_ID.test(client)) return Response.json({ error: "Unknown client." }, { status: 400 })
+    const hidden = body.hidden !== false
+    if (hidden) this.ctx.storage.sql.exec(`INSERT OR IGNORE INTO hidden_clients VALUES (?)`, client)
+    else this.ctx.storage.sql.exec(`DELETE FROM hidden_clients WHERE client_id = ?`, client)
+    for (const m of this.messages().filter((x) => x.clientId === client)) this.save({ ...m, hidden })
+    return Response.json({ hidden })
+  }
+
   private async reply(body: { id?: string; text?: string; append?: boolean }) {
     const m = body.id ? this.message(body.id) : null
     const text = String(body.text ?? "").trim().slice(0, MAX_DM)
@@ -450,6 +466,7 @@ export class StylistRoom extends DurableObject<Env> {
     this.ctx.storage.sql.exec(`DELETE FROM images`)
     this.ctx.storage.sql.exec(`DELETE FROM reader_fixes`)
     this.ctx.storage.sql.exec(`DELETE FROM voice`)
+    this.ctx.storage.sql.exec(`DELETE FROM hidden_clients`)
     this.broadcast({ type: "reset" })
     return Response.json({ ok: true })
   }
@@ -530,7 +547,7 @@ function toMessage(r: Record<string, any>): RoomMessage {
     photoTags: JSON.parse(r.photo), status: r.status, brief: JSON.parse(r.brief), corrected: JSON.parse(r.corrected),
     changed: JSON.parse(r.changed ?? "[]"), reply: r.reply, requestId: r.request_id, ms: r.ms,
     correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [], baseline: JSON.parse(r.baseline ?? "null"), redrafting: !!r.redrafting,
-    editShare: r.edit_share ?? null, sentPrice: r.sent_price ?? null, extra: JSON.parse(r.extra ?? "[]") ?? [],
+    editShare: r.edit_share ?? null, sentPrice: r.sent_price ?? null, extra: JSON.parse(r.extra ?? "[]") ?? [], hidden: !!r.hidden,
   }
 }
 

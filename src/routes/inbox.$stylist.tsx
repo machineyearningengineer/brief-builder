@@ -161,6 +161,11 @@ function InboxPage() {
             <button className="icon-btn" onClick={toggleTheme} aria-label="Switch day or night"><SunMoonIcon /></button>
           </span>
         </header>
+        <nav className="who-switch" aria-label="Stylist">
+          {(Object.keys(STYLISTS) as StylistKey[]).map((s) => (
+            <Link key={s} to="/inbox/$stylist" params={{ stylist: s }} className={s === stylist ? 'on' : ''} aria-current={s === stylist ? 'page' : undefined} aria-label={STYLISTS[s].name}>{STYLISTS[s].owner}</Link>
+          ))}
+        </nav>
         {list.length === 0 && <p className="muted empty">New DMs show up here the moment they’re sent.</p>}
         {list.map((t) => {
           const m = t.at(-1)!
@@ -385,6 +390,9 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
           <button className="icon-btn back" onClick={onBack} aria-label="All messages"><BackIcon /></button>
           <span className="avatar" aria-hidden="true">{shortId(m.clientId).slice(0, 1)}</span>
           <div><b>Client {shortId(m.clientId)}</b><small className="muted">{time(m.createdAt)}</small></div>
+          <button className={m.hidden ? 'btn stage-toggle off' : 'btn stage-toggle'} onClick={() => void post(stylist, 'hide', { clientId: m.clientId, hidden: !m.hidden }, token)}>
+            {m.hidden ? 'Show on stage' : 'Hide from stage'}
+          </button>
         </header>
         <div className="convo">
           {thread.map((t) => (
@@ -557,6 +565,11 @@ const CSS = `
 .list header { display: flex; align-items: center; gap: 4px; padding: 0 8px 12px; }
 .list header > div { flex: 1; min-width: 0; }
 .list header .home { margin-left: -10px; }
+.who-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; margin: 0 8px 12px; border-radius: 99px; background: var(--sunken); }
+.who-switch a { text-align: center; padding: 7px 0; border-radius: 99px; font-weight: 600; font-size: 14px; color: var(--muted); text-decoration: none; }
+.who-switch a.on { background: var(--accent); color: var(--on-accent); }
+.thread-bar .stage-toggle { margin-left: auto; font-size: 13px; padding: 6px 12px; }
+.thread-bar .stage-toggle.off { border-color: var(--accent); color: var(--accent); }
 .list h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .live { color: var(--faint); font-size: 13px; }
 .tools { display: flex; gap: 4px; align-items: center; }

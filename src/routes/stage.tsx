@@ -75,7 +75,9 @@ function Stage() {
     setToken(stylistToken.get())
     setOrigin(location.origin)
   }, [])
-  const { messages, connected } = useRoom(stylist, token ? { token } : null)
+  const { messages: all, connected } = useRoom(stylist, token ? { token } : null)
+  // Threads she hid from the projector never show here.
+  const messages = all.filter((m) => !m.hidden)
   const latest = messages.at(-1)
   const lastFix = [...messages].reverse().find((m) => m.corrected && m.changed.length)
   const fixes = messages.filter((m) => m.corrected).length
@@ -222,7 +224,14 @@ function Latest({ m, photo, stylist, token, first }: { m: RoomMessage; photo?: s
       {brief && m.baseline && (
         <div className="versus">
           <div className="side plain"><b>Plain model</b><p>{m.baseline.reply}</p></div>
-          <div className="side ours"><b>{first}’s draft</b><p>{brief.reply_draft}</p></div>
+          {m.reply ? (
+            <div className="side ours sent settle" key="sent"><b>Sent to the client ✓</b><p>{m.reply}</p>{m.extra.map((x, i) => <p key={i} className="extra">{x}</p>)}</div>
+          ) : (
+            <div className={m.redrafting ? 'side ours busy' : 'side ours'} key={m.redrafting ? 'busy' : 'draft'}>
+              <b>{m.redrafting ? `Re-drafting with ${first}’s fix` : `${first}’s draft`}{m.redrafting && <span className="dots"><i /><i /><i /></span>}</b>
+              <p>{brief.reply_draft}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -307,7 +316,11 @@ const STAGE_CSS = `
 .side p { margin: 0; font-size: 18px; line-height: 1.45; }
 .side.plain { background: var(--sunken); color: var(--muted); }
 .side.ours { background: var(--accent-soft); outline: 1.5px solid var(--accent); }
-.side.ours b { color: var(--accent); }
+.side.ours b { color: var(--accent); display: flex; align-items: center; gap: 8px; }
+.side.ours.busy p { opacity: 0.4; transition: opacity 200ms var(--ease); }
+.side.ours.sent { background: var(--good-soft); outline-color: var(--good); }
+.side.ours.sent b { color: var(--good); }
+.side .extra { padding-top: 8px; border-top: 1px dashed var(--line); }
 .fixline { margin: 0; padding: 12px 16px; border-radius: 16px; background: var(--good-soft); font-size: 18px; }
 .fixline b { color: var(--good); }
 .voice { margin: 0; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 16px; }
