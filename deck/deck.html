@@ -149,27 +149,21 @@
 
 <section class="slide">
   <p class="eyebrow">Use of Mubit</p>
-  <h2>Every fix improves the next draft today. Mubit trains them into her own model.</h2>
-  <div style="margin-top: 60px; display: grid; gap: 26px">
-    <div class="flow">
-      <div class="node">Client DM<small>text and photos</small></div>
-      <div class="node">Brief Builder<small>photo reader, brief, guards</small></div>
-      <div class="node hot">Mubit<small>every call, recorded per task</small></div>
-      <div class="node">gpt-6-luna<small>the provider model</small></div>
+  <h2>Every fix pays off twice.</h2>
+  <div class="row" style="grid-template-columns: 1fr 1fr; align-items: stretch; margin-top: 64px">
+    <div class="card" style="display: flex; flex-direction: column; gap: 22px; padding: 48px">
+      <p class="eyebrow" style="margin: 0">Today</p>
+      <div style="font-family: var(--display); font-weight: 700; font-size: 120px; line-height: 1; letter-spacing: -0.03em"><span class="muted" style="font-size: 72px">28% →</span> <span class="accent">52%</span></div>
+      <p style="margin: 0; font-size: 32px; line-height: 1.35">Her fix guides the next draft straight away. Replies fully right on DMs it never trained on.</p>
     </div>
-    <div class="flow">
-      <div class="node">Her fix<small>one tap on the sheet</small></div>
-      <div class="node">Re-drafted call<small>through Mubit, with her fix</small></div>
-      <div class="node">Kept example<small>her corrected answer</small></div>
-      <div class="node hot">Her own model · in progress<small>v1 on Qwen3-4B: braider 50%, colourist 33% of the way to the 95% target; nail tech training v1</small></div>
+    <div class="card" style="display: flex; flex-direction: column; gap: 22px; padding: 48px; border-color: var(--accent)">
+      <p class="eyebrow" style="margin: 0; color: var(--accent)">Over time</p>
+      <div style="font-family: var(--display); font-weight: 700; font-size: 120px; line-height: 1; letter-spacing: -0.03em">Her own model</div>
+      <p style="margin: 0; font-size: 32px; line-height: 1.35">Mubit trains her fixes into a small model just for her. In training now: her first version matches the big model on 50% of tests, aiming for 95%.</p>
+      <div class="bar" style="margin-top: auto"><i style="width: 50%"></i><s style="left: 95%; background: var(--ink)"></s></div>
     </div>
   </div>
-  <ul class="points" style="margin-top: 40px; grid-template-columns: 1fr 1fr; display: grid; column-gap: 60px">
-    <li>The instructions depend only on her profile, so each stylist is one Mubit task.</li>
-    <li>Test runs and comparison drafts send <b>x-middleware-record: off</b>: never training data.</li>
-    <li>Today: her fixes guide the next drafts straight away: 28% to 52% fully right on the locked test.</li>
-    <li>Over time: each version is graded against gpt-6-luna; one that passes can be compared in Mubit’s Try models.</li>
-  </ul>
+  <p class="muted" style="margin-top: 40px; font-size: 26px">Every model call goes through Mubit. Test runs are never used for training.</p>
 </section>
 
 <section class="slide">
@@ -180,8 +174,10 @@
       <li><b>Nothing invented:</b> every field quotes the DM or a confident photo tag, or it’s cleared.</li>
       <li><b>Her numbers:</b> prices and the closest yes come from her price list in code.</li>
       <li><b>Conversations:</b> a settled field changes only when the new message says so.</li>
+      <li><b>One Mubit task per stylist:</b> the instructions depend only on her profile; her fix rides in the message.</li>
     </ul>
     <ul class="points">
+      <li><b>Clean tests:</b> scoring runs send <b>x-middleware-record: off</b>, so they never become training data.</li>
       <li><b>Private by design:</b> clients see only their own thread; keys never reach a browser.</li>
       <li><b>Abuse limits:</b> per-client and per-room rate limits, image size checks, uploads checked by their actual file type.</li>
       <li><b>Stack:</b> TanStack Start on Cloudflare Workers, one Durable Object per stylist, Effect Schema.</li>
