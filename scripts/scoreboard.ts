@@ -35,13 +35,21 @@ function summarise(file: string | undefined, label: string, withRules = false) {
   }
 }
 
+// The model's answers vary run to run, so the locked set is run three times with her fixes and the
+// middle run is the headline, with the lowest and highest beside it.
+const correctedRuns = runs.filter((f) => f.endsWith("-corrected.jsonl")).slice(-3)
+const ranked = correctedRuns.map((f) => ({ f, s: summarise(f, "", true)! })).sort((a, b) => a.s.fullyRight - b.s.fullyRight)
+const middle = ranked[Math.floor(ranked.length / 2)]?.f
+const range = ranked.length > 1 ? { runs: ranked.length, low: ranked[0].s.fullyRight, high: ranked.at(-1)!.s.fullyRight } : null
+
 const out = {
   stylist,
   testSet: `${data.size} locked DMs, never recorded by Mubit`,
   houseRules: Object.fromEntries(profile.house_rules.map((r: any) => [r.id, r.rule])),
   base: summarise(newest(false), "gpt-6-luna"),
-  corrected: summarise(newest(true), "gpt-6-luna + stylist fixes"),
-  rules: summarise(newest(true), "+ her rules in code", true),
+  corrected: summarise(middle, "gpt-6-luna + stylist fixes"),
+  rules: summarise(middle, "+ her rules in code", true),
+  range,
   adapter: null as null | ReturnType<typeof summarise>,
 }
 const path = join(ROOT, "src", "shared", "scoreboard.json")
@@ -50,4 +58,4 @@ const all = existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {}
 const merged = "base" in all ? { [all.stylist]: all } : all
 merged[stylist] = out
 writeFileSync(path, JSON.stringify(merged, null, 2) + "\n")
-console.log(`base ${out.base?.fullyRight}% fully right · with fixes ${out.corrected?.fullyRight}% · with rules in code ${out.rules?.fullyRight}% (${out.base?.run} · ${out.corrected?.run})`)
+console.log(`base ${out.base?.fullyRight}% fully right · with fixes ${out.corrected?.fullyRight}% · with rules in code ${out.rules?.fullyRight}%${range ? ` (${range.low}–${range.high}% over ${range.runs} runs)` : ""}`)

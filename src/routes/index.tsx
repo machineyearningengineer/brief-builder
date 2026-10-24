@@ -37,7 +37,7 @@ function Home() {
         <section className="proof" aria-label="Results">
           <div className="big">
             <span className="num">{hero.now}%</span>
-            <span className="what"><Tip tip="Every detail of the brief matches what she would have written: service, look, day, price details and what to do next. Measured on 60 test DMs Mubit never trained on.">of replies fully right on DMs it never trained on</Tip></span>
+            <span className="what"><Tip tip="Every detail of the brief matches what she would have written: service, look, day, price details and what to do next. Measured on 60 test DMs Mubit never trained on, run three times; this is the middle run.">of replies fully right on DMs it never trained on</Tip></span>
           </div>
           <Steps {...hero} />
         </section>
@@ -138,7 +138,7 @@ function Steps({ plain, fixes, now }: { plain: number; fixes: number; now: numbe
       <dl>
         <div><dt><Tip tip="The base model on its own, with her prices and house rules in its instructions.">Plain model</Tip></dt><dd>{plain}%</dd></div>
         <div><dt><Tip tip="Her closest past fixes go into each draft as worked examples.">Her fixes</Tip></dt><dd>{fixes}%</dd></div>
-        <div><dt><Tip tip="Code decides the next step, what’s missing, dates and time windows, following her rules exactly." align="end">Her rules in code</Tip></dt><dd className="accent">{now}%</dd></div>
+        <div><dt><Tip tip="Code applies her stated rules exactly: the next step, what’s missing, dates, photo clashes, consultations and soak-offs." align="end">Her rules in code</Tip></dt><dd className="accent">{now}%</dd></div>
       </dl>
     </div>
   )

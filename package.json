@@ -11,7 +11,8 @@
 		"build": "vite build",
 		"deploy": "cf deploy",
 		"data:check": "node scripts/check-data.ts",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"rules:check": "node scripts/check-rules.ts"
 	},
 	"dependencies": {
 		"@tailwindcss/vite": "^4.1.18",

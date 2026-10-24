@@ -16,12 +16,12 @@ import nailsCorrections from "../../data/nails/corrections.jsonl?raw"
 import braiderVoice from "../../data/braider/voice.jsonl?raw"
 import colouristVoice from "../../data/colourist/voice.jsonl?raw"
 import nailsVoice from "../../data/nails/voice.jsonl?raw"
-import { datesNote, decide } from "../shared/decide.ts"
+import { datesNote } from "../shared/decide.ts"
 import { estimate } from "../shared/pricing.ts"
 import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
 import { closestCorrections, closestVoice, correctionsBlock, editShare, voiceBlock, type Correction, type VoiceEdit } from "./corrections.ts"
-import { applyTrustedPhotoTags, carryForward, guardEvidence, settledBlock } from "./guards.ts"
+import { finishBrief, settledBlock } from "./guards.ts"
 import { readPhotos, type ReaderFix } from "./photo-reader.ts"
 
 const PROFILES = {
@@ -387,22 +387,7 @@ export class StylistRoom extends DurableObject<Env> {
       ? { reply: plainBrief.reply_draft.replace(/\s*[—–]\s*/g, ", "), nextAction: String(plainBrief.next_action ?? ""), ms: plain.ms }
       : null
     const brief = result.brief as Record<string, any> | null
-    // Photos sent earlier in the conversation still count: "does that include hair?" is about them.
-    const threadTags = [...history.flatMap((h) => h.dm.photo?.reader_output ?? []), ...(m.photoTags ?? [])]
-    const trusted = new Set(threadTags.filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
-    if (brief && threadTags.length) {
-      applyTrustedPhotoTags(brief, threadTags, (tags as any).trust_threshold)
-      // A field the photo now answers is no longer something to ask about.
-      if (Array.isArray(brief.missing)) brief.missing = brief.missing.filter((k: string) => brief.look?.[k] === undefined || brief.look[k] === "unknown")
-    }
-    // Evidence can come from any message in the conversation, not just the newest one.
-    const said = [...history.map((h) => h.dm.text), m.text].join("\n")
-    const guarded = brief ? guardEvidence(brief, said, trusted) : []
-    // A field carried forward from earlier in the thread wasn't really cleared.
-    const carried = brief ? carryForward(brief, history.at(-1)?.brief ?? null, m.text) : []
-    const stillCleared = guarded.filter((p) => !carried.includes(p))
-    // Next step, what's missing, dates from day words and time windows are decided in code.
-    if (brief) decide(this.stylist!, brief, { text: m.text, received_at: m.receivedAt, photo: { reader_output: threadTags } })
+    const stillCleared = brief ? finishBrief(this.stylist!, brief, { text: m.text, received_at: m.receivedAt, photoTags: m.photoTags ?? null }, history, (tags as any).trust_threshold).cleared : []
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")

@@ -58,7 +58,7 @@ export function resolveDates(text: string, receivedAt: string): string[] | null 
   const found: { at: number; date: string }[] = []
   const words = /\b(today|tonight|tomorrow|tmrw|tmr)\b/g
   for (const m of t.matchAll(words)) found.push({ at: m.index!, date: add(m[1] === 'today' || m[1] === 'tonight' ? 0 : 1) })
-  for (const m of t.matchAll(/\b(sun|mon|tue|wed|thu|fri|sat)(?:day|s|nesday|urs|ursday|urday|ur)?\b/g)) {
+  for (const m of t.matchAll(/\b(sun|mon|tue|wed|thu|fri|sat)(?:day|s|sday|nesday|rs|rsday|urs|ursday|urday|ur)?\b/g)) {
     const gap = (DAYS.indexOf(m[1]) - today.getUTCDay() + 7) % 7
     found.push({ at: m.index!, date: add(gap === 0 ? 7 : gap) })
   }
@@ -111,7 +111,7 @@ const LONG = ['waist', 'butt']
 
 // Fields where a clash between photo and text becomes a question (rule 11 for every stylist).
 const CLASH: Record<StylistKey, string[]> = { braider: ['length', 'ends'], colourist: ['length', 'shade'], nails: ['length'] }
-const CODE_QUESTIONS = ['length_photo', 'confirm_length', 'confirm_ends', 'confirm_shade']
+const CODE_QUESTIONS = ['length_photo', 'confirm_length', 'confirm_ends', 'confirm_shade', 'consultation', 'design_photo', 'nail_photo']
 
 // Rule 11, exactly: a trusted photo tag that disagrees with what the client wrote becomes a
 // question (text still wins on the sheet). And the braider's rule 2: short 4a-4c hair going waist
@@ -140,8 +140,53 @@ export function hairIncluded(text: string): 'yes' | 'no' | null {
   return yes === no ? null : yes ? 'yes' : 'no'
 }
 
+// Her other rules that follow from the words alone. Each was checked against every label she has
+// written (training sets and saved corrections) before it was trusted here.
+const CHILD = /\b(my|for (my|her|his)) (son|daughter|kid|kids|child|little one|niece|nephew)\b|\b(son|daughter|niece|nephew)('s| is)? (is )?\d{1,2}\b|\b(he|she)('s| is) (only )?\d{1,2}\b|\bdo (u|you) do kids\b/i
+const OTHER_SALON = /(from|at|by) (another|a different|other|somewhere|some other) (place|salon|shop)|somewhere else|another salon/i
+const OWN_WORK = /(they'?re|they are|it'?s|it was|were|was) (done )?(from|by|with) you|(you|u) did (them|it|my)|did them with you|done (by|with) you/i
+const DESIGN = /pinterest|tiktok|instagram|insta\b|this design|saw (it|this) on/i
+const BITTEN = /\bbite\b|\bbitten\b|\bbiting\b|very short nails|really short nails/i
+const UNWELL = /\b(green|yellow)\b.*\bnail|\bnail.*\b(green|yellow)\b|infect|lifting.*discolou?r|discolou?r.*lifting/i
+const EXTENSIONS = ['acrylic_full_set', 'gel_extensions']
+
+function wordRules(stylist: StylistKey, brief: Record<string, any>, text: string): string[] {
+  const asks: string[] = []
+  if (stylist === 'braider') {
+    // Rule 8: wig installs are declined. Rule 7: a child's hair is referred elsewhere.
+    if (brief.service === 'wig_install') brief.next_action = 'decline'
+    else if (CHILD.test(text)) brief.next_action = 'refer'
+    // Those are her only reasons to turn a braiding DM away; settle() works out the real next step.
+    else if (brief.next_action === 'decline' || brief.next_action === 'refer') brief.next_action = 'ask'
+  }
+  if (stylist === 'colourist') {
+    // Rule 15: box-dyed or lightened hair needs a consultation first, roots and toners excepted.
+    const history = brief.look?.history
+    if ((history === 'box_dye' || history === 'previously_lightened') && brief.service !== 'root_touch_up' && brief.service !== 'toner') asks.push('consultation')
+  }
+  if (stylist === 'nails') {
+    const look = (brief.look ??= {})
+    // Rule 20: ballerina means coffin.
+    if (/ballerina/i.test(text)) look.shape = 'coffin'
+    // Rule 17: who did the product decides the soak-off.
+    if (OWN_WORK.test(text)) brief.removal = 'own_work'
+    else if (OTHER_SALON.test(text)) brief.removal = 'other_salon'
+    // Rule 21: an infill more than three weeks after the set is a new full set.
+    const weeks = text.match(/(\d+)\s*(weeks?|wks?)\s*ago/i)
+    if (brief.service === 'acrylic_infill' && weeks && Number(weeks[1]) > 3) brief.service = 'acrylic_full_set'
+    // Rules 22 and 18: a design from social needs its photo; bitten nails need a photo before extensions.
+    if (DESIGN.test(text)) asks.push('design_photo')
+    if (BITTEN.test(text) && EXTENSIONS.includes(brief.service)) asks.push('nail_photo')
+    // Rule 19: possible infection is never booked; she refers them kindly.
+    if (UNWELL.test(text)) brief.next_action = 'refer'
+  }
+  return asks
+}
+
 // Everything code decides for a fresh draft: dates, window, then missing and next step.
-export function decide(stylist: StylistKey, brief: Record<string, any>, dm: { text: string; received_at: string; photo?: { reader_output?: PhotoTag[] } | null }): void {
+// thread is the whole conversation so far: her word rules hold for anything said in it ("it's for my
+// son" still applies to "how much?"), while dates come from the newest message alone.
+export function decide(stylist: StylistKey, brief: Record<string, any>, dm: { text: string; received_at: string; thread?: string; photo?: { reader_output?: PhotoTag[] } | null }): void {
   brief.when ??= { dates: [], window: null }
   const dates = resolveDates(dm.text, dm.received_at)
   if (dates) brief.when.dates = dates
@@ -156,9 +201,10 @@ export function decide(stylist: StylistKey, brief: Record<string, any>, dm: { te
     const said = hairIncluded(dm.text)
     if (said) brief.hair_included = said
   }
+  const asks = wordRules(stylist, brief, dm.thread ?? dm.text)
   if (brief.next_action !== 'decline' && brief.next_action !== 'refer') {
     const asked = (Array.isArray(brief.missing) ? brief.missing : []).filter((k: string) => !CODE_QUESTIONS.includes(k))
-    brief.missing = [...asked, ...photoQuestions(stylist, brief, dm.photo?.reader_output ?? [])]
+    brief.missing = [...asked, ...asks, ...photoQuestions(stylist, brief, dm.photo?.reader_output ?? [])]
   }
   settle(stylist, brief)
 }

@@ -56,16 +56,19 @@ flowchart LR
 ## Results
 
 Locked test DMs, never sent to Mubit for training. Fully right means every field of the brief matches.
+With her fixes, each set was run three times; the table shows the middle run, the range in brackets.
 
 | Stylist | Test DMs | Plain model | With her fixes | + her rules in code |
 | --- | --- | --- | --- | --- |
-| Amara Braids, braider | 60 | 30% | 53% | **87%** |
-| Lived-in Colour, colourist | 20 | 15% | 60% | **90%** |
-| Gloss by Jade, nail tech | 24 | 25% | 50% | **92%** |
+| Amara Braids, braider | 60 | 30% | 47% | **85%** (85–90) |
+| Lived-in Colour, colourist | 20 | 15% | 45% | **90%** (85–95) |
+| Gloss by Jade, nail tech | 24 | 25% | 46% | **92%** (92–96) |
 
-Her rules in code decide the next step, what’s missing, dates from day words and time windows
-(`src/shared/decide.ts`). They were checked against the training labels first (198 of 200 next steps,
-every resolved date), then scored once on the locked sets.
+Her rules in code decide the next step, what’s missing, dates and time windows, a clash between
+photo and text, and her yes-or-no rules: wig installs declined, children referred, a consultation
+for box-dyed hair, the soak-off for another salon's gel, a new set after three weeks
+(`src/shared/decide.ts`). `pnpm rules:check` proves they agree with every label she has written,
+training sets and saved corrections; only then are the locked sets scored.
 
 ## How the code is organised
 

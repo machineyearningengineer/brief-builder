@@ -1,3 +1,6 @@
+import { decide } from "../shared/decide.ts"
+import type { StylistKey } from "../shared/stylists.ts"
+
 // Checks a model brief before anyone sees it. A field whose evidence isn't really in the DM
 // (or isn't a trusted photo tag) becomes "unknown": nothing invented reaches the screen.
 
@@ -49,7 +52,8 @@ export function guardEvidence(brief: Record<string, any>, text: string, trustedP
   const raw = brief.evidence && typeof brief.evidence === "object" ? brief.evidence : {}
   const evidence: Record<string, string> = Object.fromEntries(Object.entries(raw).flatMap(([k, v]) => {
     const q = Array.isArray(v) ? v.find((x) => typeof x === "string") : v
-    return typeof q === "string" ? [[k, q]] : []
+    // A quote wrapped in its own quotation marks is still the client's words.
+    return typeof q === "string" ? [[k, q.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")]] : []
   }))
   brief.evidence = evidence
   const haystack = text.toLowerCase()
@@ -109,4 +113,54 @@ export function settledBlock(before: Record<string, any> | null): string {
   if (Array.isArray(before.look?.art) && before.look.art.length) known.push(`look.art=${before.look.art.join("+")}`)
   if (before.service && before.service !== "unknown") known.unshift(`service=${before.service}`)
   return known.length ? `\n\nAlready settled in this conversation (by the client, the photo or the stylist). Use these and don't ask for them again unless the new DM changes them: ${[...new Set(known)].join(", ")}` : ""
+}
+
+// Words she quoted but the model left unknown: "mid-back" is mid_back. Only exact phrases from
+// the field's own vocabulary are read, so nothing is guessed.
+const PHRASES: Record<string, [RegExp, string][]> = {
+  "look.length": [[/bra[\s-]?strap/, "bra_strap"], [/mid[\s-]?back/, "mid_back"], [/waist/, "waist"], [/\b(butt|bum)\b/, "butt"], [/shoulder/, "shoulder"]],
+  "look.ends": [[/curly ends|curls at the ends|ends curly|just the ends/, "curly_ends"], [/boho|curls (all )?through(out)?/, "boho_throughout"]],
+  "look.size": [[/smedium/, "smedium"], [/\bjumbo\b/, "jumbo"], [/\blarge\b/, "large"], [/\bmedium\b/, "medium"], [/\bsmall\b/, "small"]],
+}
+export function fillFromQuotes(brief: Record<string, any>): string[] {
+  const filled: string[] = []
+  for (const [path, phrases] of Object.entries(PHRASES)) {
+    const quote = brief.evidence?.[path]
+    if (getPath(brief, path) !== "unknown" || typeof quote !== "string" || quote.startsWith("[")) continue
+    const hit = phrases.filter(([re]) => re.test(quote.toLowerCase()))
+    // One phrase, one value; a quote that names two ("boho ends, just the ends curly") stays a question.
+    if (hit.length === 1) {
+      setPath(brief, path, hit[0][1])
+      filled.push(path)
+    }
+  }
+  return filled
+}
+
+// Everything that happens to a model's brief before anyone sees it, in order. The room runs this
+// on every draft and the scorer runs it on every saved answer, so a score measures the real app.
+export function finishBrief(
+  stylist: StylistKey,
+  brief: Record<string, any>,
+  dm: { text: string; received_at: string; photoTags: { field: string; tag: string; confidence: number }[] | null },
+  history: { dm: { text: string; photo?: { reader_output?: { field: string; tag: string; confidence: number }[] } | null }; brief: Record<string, any> | null }[],
+  threshold: number,
+): { cleared: string[] } {
+  // Photos sent earlier in the conversation still count: "does that include hair?" is about them.
+  const threadTags = [...history.flatMap((h) => h.dm.photo?.reader_output ?? []), ...(dm.photoTags ?? [])]
+  const trusted = new Set(threadTags.filter((t) => t.confidence >= threshold).map((t) => t.field))
+  if (threadTags.length) {
+    applyTrustedPhotoTags(brief, threadTags, threshold)
+    // A field the photo now answers is no longer something to ask about.
+    if (Array.isArray(brief.missing)) brief.missing = brief.missing.filter((k: string) => brief.look?.[k] === undefined || brief.look[k] === "unknown")
+  }
+  // Evidence can come from any message in the conversation, not just the newest one.
+  const said = [...history.map((h) => h.dm.text), dm.text].join("\n")
+  const guarded = guardEvidence(brief, said, trusted)
+  fillFromQuotes(brief)
+  // A field carried forward from earlier in the thread wasn't really cleared.
+  const carried = carryForward(brief, history.at(-1)?.brief ?? null, dm.text)
+  // Next step, what's missing, dates, windows and her stated rules are decided in code.
+  decide(stylist, brief, { text: dm.text, received_at: dm.received_at, thread: said, photo: { reader_output: threadTags } })
+  return { cleared: guarded.filter((p) => !carried.includes(p)) }
 }
