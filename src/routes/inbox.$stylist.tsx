@@ -521,7 +521,10 @@ function BookIt({ m, thread, brief, stylist, token }: { m: RoomMessage; thread: 
   const [date, setDate] = useState<string>(brief.when?.dates?.[0] ?? '')
   const [time, setTime] = useState<string>(window)
   const [busy, setBusy] = useState(false)
-  useEffect(() => { setDate(brief.when?.dates?.[0] ?? ''); setTime(window) }, [m.id, brief.when?.dates?.[0], window])
+  const [open, setOpen] = useState(false)
+  useEffect(() => { setDate(brief.when?.dates?.[0] ?? ''); setTime(window); setOpen(false) }, [m.id, brief.when?.dates?.[0], window])
+  // Ready when the conversation has settled both a day and a time: one tap, no form.
+  const ready = !!(brief.when?.dates?.[0] && window)
   if (booked) {
     const day = new Date(`${booked.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
     return <p className="booked settle">✓ Booked · {day}, {booked.time}{booked.total != null ? ` · £${booked.total}` : ''}</p>
@@ -530,6 +533,16 @@ function BookIt({ m, thread, brief, stylist, token }: { m: RoomMessage; thread: 
     setBusy(true)
     try { await post(stylist, 'book', { id: m.id, date, time }, token) } finally { setBusy(false) }
   }
+  if (ready && !open) {
+    const day = new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+    return (
+      <div className="book ready">
+        <button className="btn primary" disabled={busy} onClick={() => void book()}>Confirm booking · {day}, {time}</button>
+        <button className="btn quiet" onClick={() => setOpen(true)}>Change</button>
+      </div>
+    )
+  }
+  if (!open) return <button className="book-link" onClick={() => setOpen(true)}>Book a time</button>
   return (
     <form className="book" onSubmit={(e) => { e.preventDefault(); void book() }}>
       <label className="sr-only" htmlFor={`book-day-${m.id}`}>Day</label>
@@ -604,6 +617,8 @@ const CSS = `
 .book { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .book input { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--surface); color: var(--ink); font: inherit; }
 .book .btn { flex: 1 0 auto; }
+.book.ready .btn.quiet { flex: 0 0 auto; background: transparent; }
+.book-link { margin-top: 8px; padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; cursor: pointer; }
 .booked { margin: 10px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--good-soft); color: var(--good); font-weight: 700; }
 .failed { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--muted); }
 .thread-bar .stage-toggle { margin-left: auto; font-size: 13px; padding: 6px 12px; }
