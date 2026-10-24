@@ -1,14 +1,21 @@
-// Narrates voiceover.json with ElevenLabs, one clip per line, into public/vo/<voice>/.
+// Narrates voiceover.json with ElevenLabs, one clip per line, then mixes them into one track,
+// public/vo/<voice>/track.wav, each clip faded in and out so no edit clicks.
 // The key comes from the Keychain (service "elevenlabs-api-key") and is never printed.
-// Usage: node scripts/voiceover.mjs [nathaniel|lauren|jessica]   then render with --props='{"voice":"nathaniel"}'
+// Usage: node scripts/voiceover.mjs [voice] [model]   then render with --props='{"voice":"nathaniel"}'
 import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 
-// Calm voices saved in the ElevenLabs account.
-const VOICES = { nathaniel: "AeRdCCKzvd23BpJoofzx", lauren: "v8DWAeuEGQSfwxqdH9t2", jessica: "S1eyUQsxwzBMtM9piGTQ" }
-const name = process.argv[2] ?? "nathaniel"
+// Calm voices: saved in the account, or from the shared library.
+const VOICES = {
+  nathaniel: "AeRdCCKzvd23BpJoofzx", lauren: "v8DWAeuEGQSfwxqdH9t2", jessica: "S1eyUQsxwzBMtM9piGTQ",
+  jessa: "yj30vwTGJxSHezdAGsv9", lily: "qBDvhofpxp92JgXJxDjB", samantha: "uIZsnBL0YK1S5j69bAih",
+}
+const args = process.argv.slice(2).filter((a) => !a.startsWith("--"))
+const name = args[0] ?? "nathaniel"
 const voice = VOICES[name]
 if (!voice) throw new Error(`Unknown voice ${name}; one of ${Object.keys(VOICES).join(", ")}`)
+// eleven_v3 sounds more natural but reads each line on its own, without its neighbours.
+const model = args[1] ?? "eleven_multilingual_v2"
 
 const key = execFileSync("security", ["find-generic-password", "-s", "elevenlabs-api-key", "-w"], { encoding: "utf8" }).trim()
 const lines = JSON.parse(readFileSync(new URL("../voiceover.json", import.meta.url), "utf8"))
@@ -21,10 +28,9 @@ async function speak(i, speed) {
     method: "POST",
     body: JSON.stringify({
       text: lines[i].text,
-      model_id: "eleven_multilingual_v2",
+      model_id: model,
       // Neighbouring lines keep the read sounding like one take.
-      previous_text: lines[i - 1]?.text,
-      next_text: lines[i + 1]?.text,
+      ...(model === "eleven_v3" ? {} : { previous_text: lines[i - 1]?.text, next_text: lines[i + 1]?.text }),
       voice_settings: { stability: 0.6, similarity_boost: 0.8, style: 0, use_speaker_boost: true, speed },
     }),
   })
@@ -34,7 +40,11 @@ async function speak(i, speed) {
   return Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file.pathname], { encoding: "utf8" }))
 }
 
-for (const i of lines.keys()) {
+// --mix re-places the clips already recorded, after a timing change, without recording again.
+// --only=11,13 records just those lines again.
+const only = process.argv.find((a) => a.startsWith("--only="))?.slice(7).split(",").map(Number)
+if (!process.argv.includes("--mix")) for (const i of lines.keys()) {
+  if (only && !only.includes(i)) continue
   // Each clip has to finish before the next line starts; one that runs over is read a little faster.
   const room = (lines[i + 1]?.at ?? 118) - lines[i].at - 0.2
   let secs = await speak(i, 1)
@@ -45,3 +55,10 @@ for (const i of lines.keys()) {
   }
   console.log(`${String(i).padStart(2, "0")}  ${secs.toFixed(1)}s of ${room.toFixed(1)}s${speed !== 1 ? `  at ${speed}×` : ""}${secs > room ? "  ← still too long" : ""}`)
 }
+
+// One continuous track: each clip faded at both ends and placed at its time.
+const clips = [...lines.keys()].map((i) => new URL(`${String(i).padStart(2, "0")}.mp3`, dir).pathname)
+const filters = lines.map((l, i) => `[${i}:a]aresample=44100,afade=t=in:d=0.02,areverse,afade=t=in:d=0.06,areverse,adelay=${Math.round(l.at * 1000)}:all=1[a${i}]`)
+const mix = `${lines.map((_, i) => `[a${i}]`).join("")}amix=inputs=${lines.length}:normalize=0:duration=longest,apad=whole_dur=118[out]`
+execFileSync("ffmpeg", ["-y", "-v", "error", ...clips.flatMap((c) => ["-i", c]), "-filter_complex", [...filters, mix].join(";"), "-map", "[out]", "-ac", "1", new URL("track.wav", dir).pathname])
+console.log(`track: public/vo/${name}/track.wav`)
