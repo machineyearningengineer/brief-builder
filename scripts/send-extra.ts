@@ -1,6 +1,6 @@
 // Sends hand-written, unlabelled DMs through Mubit as training input. Mubit learns from the
 // model's answers, so these need no labels; they add variety the generated set lacks.
-// Usage: node scripts/send-extra.ts <stylist> [--effort medium] [--concurrency 3]
+// Usage: node scripts/send-extra.ts <stylist> [--file extra-train.txt] [--effort medium] [--concurrency 3]
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { Schema } from "effect"
@@ -13,12 +13,13 @@ const flag = (name: string, fallback: string) => (args.includes(`--${name}`) ? a
 const stylist = args[0] as "braider" | "colourist"
 const effort = flag("effort", "medium") as "low" | "medium"
 const concurrency = Number(flag("concurrency", "3"))
+const file = flag("file", "extra-train.txt")
 
 const env = Object.fromEntries(readFileSync(join(ROOT, ".dev.vars"), "utf8").trim().split("\n").map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]))
 const read = (f: string) => JSON.parse(readFileSync(join(ROOT, "data", stylist, f), "utf8"))
 const profile = read("profile.json")
 const tags = read("tags.json")
-const texts = readFileSync(join(ROOT, "data", stylist, "extra-train.txt"), "utf8").split("\n").map((l) => l.trim()).filter(Boolean)
+const texts = readFileSync(join(ROOT, "data", stylist, file), "utf8").split("\n").map((l) => l.trim()).filter(Boolean)
 const isValid = Schema.is(briefSchemaFor[stylist] as Schema.Top)
 
 // Received times spread over 16–23 October, 08:00–22:00 London time (BST, +01:00).
