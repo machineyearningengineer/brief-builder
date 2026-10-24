@@ -86,7 +86,9 @@ function Stage() {
         <span className={connected ? 'dot on' : 'dot'} title={connected ? 'Live' : 'Connecting'} />
         <div className="switch">
           {(Object.keys(STYLISTS) as StylistKey[]).map((s) => (
-            <button key={s} className={s === stylist ? 'btn primary' : 'btn'} onClick={() => setStylist(s)}>{STYLISTS[s].name}</button>
+            <button key={s} className={s === stylist ? 'btn primary' : 'btn'} onClick={() => setStylist(s)} aria-pressed={s === stylist} aria-label={STYLISTS[s].name}>
+              <span className="long">{STYLISTS[s].name}</span><span className="short">{STYLISTS[s].owner}</span>
+            </button>
           ))}
         </div>
       </nav>
@@ -262,6 +264,8 @@ const STAGE_CSS = `
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
 .dot.on { background: var(--good); }
 .switch { margin-left: auto; display: flex; gap: 8px; }
+.switch .btn { white-space: nowrap; }
+.switch .short { display: none; }
 .join { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 10px; padding: 28px; border-radius: 28px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .join .qr { padding: 14px; border-radius: 20px; background: oklch(100% 0 0); line-height: 0; align-self: stretch; display: grid; place-items: center; }
 .join .qr svg { width: 100%; height: auto; max-width: 460px; }
@@ -321,5 +325,13 @@ dl { margin: 0; }
 .model .meter { position: relative; height: 8px; border-radius: 8px; background: var(--sunken); }
 .model .meter i { position: absolute; inset: 0 auto 0 0; border-radius: 8px; background: var(--accent); }
 .model .meter s { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+@media (max-width: 700px) {
+  .top { flex-wrap: wrap; }
+  .switch { margin-left: 0; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 99px; background: var(--sunken); }
+  .switch .btn { border: 0; background: transparent; padding: 10px 0; }
+  .switch .btn.primary { background: var(--accent); }
+  .switch .long { display: none; }
+  .switch .short { display: inline; }
+}
 @media (max-width: 1280px) { .stage { height: auto; overflow: visible; grid-template-columns: minmax(0, 1fr); padding: 20px 16px; } .join .qr svg { max-width: 280px; }  }
 `
