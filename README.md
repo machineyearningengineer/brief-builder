@@ -5,9 +5,12 @@ A stylist’s DM inbox that drafts priced replies in her voice, and learns from 
 
 <p align="center">
   <a href="https://brief-builder.buy-ea2.workers.dev/s/braider">Try it as a client</a> ·
+  <a href="https://github.com/machineyearningengineer/brief-builder/releases/download/v1.0/brief-builder-launch.mp4">Watch the film</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#results">Results</a>
 </p>
+
+[![Watch the film: one DM becomes a priced reply, one tap fixes it, and the next client gets it right](docs/screens/film-poster.webp)](https://github.com/machineyearningengineer/brief-builder/releases/download/v1.0/brief-builder-launch.mp4)
 
 ![The stylist's inbox: a client's photo and "can u do these? saturday", the reply in her voice, and the service sheet with every field's source](docs/screens/inbox-photo.webp)
 
