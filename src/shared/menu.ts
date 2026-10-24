@@ -99,7 +99,13 @@ export const WORK: Record<StylistKey, { src: string; alt: string }[]> = {
     { src: '/work/soft-locs.webp', alt: 'Soft locs' },
   ],
   colourist: [{ src: '/work/curls.webp', alt: 'Copper colour on 3c curls' }],
-  nails: [],
+  nails: [
+    { src: '/work/chrome-aura.webp', alt: 'Plum chrome aura on soft-square nails' },
+    { src: '/work/biab-micro-french.webp', alt: 'BIAB with micro-French tips' },
+    { src: '/work/line-art.webp', alt: 'Abstract line art on medium almond nails' },
+    { src: '/work/stock-stiletto-jewels.webp', alt: 'Chrome and jewelled stiletto set' },
+    { src: '/work/stock-tortoiseshell.webp', alt: 'Black and tortoiseshell gel on short round nails' },
+  ],
 }
 
 export const POLICIES: Record<StylistKey, string[]> = {

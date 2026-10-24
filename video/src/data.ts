@@ -50,8 +50,9 @@ export const stylists = [
   },
   {
     name: "Gloss by Jade", area: "Hackney", craft: "BIAB, gel, acrylics",
-    dm: "hiya can i get long coffin acrylics with chrome on sat, got gel on from another salon",
-    reply: "Hiya! Yes lovely, long coffin acrylics with chrome and a soak-off from another salon would be £68. I have Saturday at 10am or 1pm available, would either suit?",
+    // A screenshot of someone else's story, the way clients really send references.
+    dm: "can u do these 😍 how much", photo: "story-stiletto-cat-eye.webp",
+    reply: "Yes 😍 An XL acrylic set with stiletto shape and cat-eye finish would be £61. Do you have any product on your nails at the moment?",
   },
 ]
 
