@@ -21,3 +21,8 @@ runs/
 
 # cf build output
 .cloudflare/
+
+# Screenshots of other people's stories, used only as local demo DMs
+demo/client-photos/
+video/public/story-*
+video/out/

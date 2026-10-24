@@ -1,200 +1,58 @@
-Welcome to your new TanStack Start app!
+# Brief Builder
 
-# Getting Started
+Turn "can u do these?" into a booking.
 
-To run this application:
+A stylist's DMs are vague: a photo and three words. Brief Builder turns each one into a priced
+service sheet and a reply that follows her house rules, her prices and her voice. She fixes
+anything with one tap, and every fix makes the next draft better. Built for Night Shift
+(London, 23–25 Oct 2026); every model call goes through [Mubit](https://mubit.ai).
+
+Live: https://brief-builder.buy-ea2.workers.dev
+
+- `/s/braider`, `/s/colourist`, `/s/nails`: the client's DM chat, with the stylist's profile and prices
+- `/inbox/<stylist>`: the stylist's inbox (needs the stylist key)
+- `/stage`: the projector view: locked-test scoreboard, live room, Mubit adapter status
+
+## How it works
+
+1. **Photo reader.** gpt-6-luna (through Mubit) reads attached photos into tags from the
+   stylist's own list (`data/<stylist>/tags.json`), each with a confidence. Tags under 0.6 are ignored.
+2. **Brief.** One call through Mubit turns the DM, the photo tags and the conversation so far
+   into a brief (`src/shared/brief.ts`) and a reply draft. The instructions are built only from
+   the stylist's profile, so Mubit groups every call into one task per stylist.
+3. **Guards.** Every field must quote the DM or a trusted photo tag, or it's cleared. Prices on
+   screen come from her price list (`src/shared/pricing.ts`), never from the model.
+4. **Her fixes.** A one-tap fix is stored, and the closest past fixes go into the next prompts as
+   worked examples. The reply is re-drafted through Mubit, and that call is recorded, so the
+   corrected answer becomes training data for her adapter.
+5. **Her voice.** When she rewrites a draft before sending, the pair is kept and the closest
+   rewrites shape the next drafts. The stage shows how much she rewrites each draft.
+6. **Photos like this one.** A photo fix applies only to new photos whose other tags mostly match.
+7. **Conversations.** Follow-ups carry the brief forward. A settled field changes only when the
+   new message says so, and a fix after sending offers the client a price correction.
+
+## Results
+
+Locked test sets, never recorded by Mubit, scored with `scripts/replay.ts` and `scripts/score.ts`:
+
+| Stylist | Test DMs | Fully right, plain | Fully right, with her fixes |
+| --- | --- | --- | --- |
+| Braider | 60 | 28% | 52% |
+| Colourist | 20 | 0% | 35% |
+| Nail tech | 24 | 29% | 58% |
+
+## Stack
+
+TanStack Start on Cloudflare Workers, one Durable Object per stylist (SQLite, WebSocket
+hibernation), Effect Schema, deployed with the `cf` CLI. The launch film in `video/` is
+Remotion, built from real app outputs and the scoreboard files.
+
+## Run it
 
 ```bash
 pnpm install
-pnpm dev
+printf 'MUBIT_API_KEY=...\nSTYLIST_TOKEN=...\n' > .dev.vars
+pnpm run dev
 ```
 
-# Building For Production
-
-To build this application for production:
-
-```bash
-pnpm build
-```
-
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
-
-
-## Deploy to Cloudflare Workers
-
-This project uses the Cloudflare Vite plugin (configured in `vite.config.ts`) and `wrangler.jsonc`:
-
-1. Install Wrangler: `npm install -g wrangler`
-2. Authenticate: `wrangler login`
-3. Deploy: `npx wrangler deploy`
-
-For production env vars, run `wrangler secret put MY_VAR` for each secret listed in `.env.example`. Public (non-secret) vars go in `wrangler.jsonc` under `vars`.
-
-KV, D1, R2, and Durable Object bindings are configured in `wrangler.jsonc` — see https://developers.cloudflare.com/workers/wrangler/configuration/.
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+Photo credits: `public/work/CREDITS.md`.
