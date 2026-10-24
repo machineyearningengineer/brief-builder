@@ -43,7 +43,7 @@ function Stage() {
   const latest = messages.at(-1)
   const fixes = messages.filter((m) => m.corrected).length
   const lastFix = [...messages].reverse().find((m) => m.corrected && m.changed.length)
-  const adapter = (mubit.adapters as Record<string, { version: string; base: string; quality: number; target: number; tests: number; kept: number; state: string }>)[stylist]
+  const adapter = (mubit.adapters as Record<string, { version: string; base: string; quality: number; target: number; tests: number; kept: number; state: string; next?: string | null }>)[stylist]
   const board = BOARDS[stylist]
   const base = board?.base
   const fixed = board?.corrected
@@ -53,7 +53,7 @@ function Stage() {
       <header>
         <div>
           <p className="eyebrow">Brief Builder · {board?.testSet ?? 'locked test set'}</p>
-          <h1>Every fix a stylist makes becomes their own model.</h1>
+          <h1>Every fix makes the next draft better, and trains her own model.</h1>
         </div>
         <div className="switch" role="group" aria-label="Stylist">
           {(Object.keys(STYLISTS) as StylistKey[]).map((s) => (
@@ -133,10 +133,11 @@ function Stage() {
         {lastFix && <FixLine m={lastFix} name={STYLISTS[stylist].name.split(' ')[0]} />}
         {adapter && (
           <div className="mubit">
-            <p className="eyebrow">Mubit model for {STYLISTS[stylist].name.split(' ')[0]}</p>
+            <p className="eyebrow">{STYLISTS[stylist].name.split(' ')[0]}’s own model · in training on Mubit</p>
             <p><b>{adapter.version}</b> on {adapter.base} · trained on {adapter.kept}+ kept examples</p>
             <div className="meter" aria-label={`${adapter.quality}% of target`}><i style={{ width: `${adapter.quality}%` }} /><span style={{ left: `${adapter.target}%` }} /></div>
-            <p className="muted">Matches the big model on {adapter.quality}% of {adapter.tests} test cases (target {adapter.target}%). {adapter.state}. Checked {mubit.checkedAt}.</p>
+            <p className="muted">Matches the big model on {adapter.quality}% of {adapter.tests} test cases, aiming for {adapter.target}%. {adapter.state}. Checked {mubit.checkedAt}.</p>
+            {adapter.next && <p className="muted">{adapter.next}</p>}
           </div>
         )}
         <VoiceLine messages={messages} name={STYLISTS[stylist].name.split(' ')[0]} />

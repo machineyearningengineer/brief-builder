@@ -3,7 +3,7 @@ import { AbsoluteFill, Img, Series, interpolate, staticFile, useCurrentFrame } f
 import { CANVAS_FRAMES, CLOSEST_FRAMES, ClosestYesScene, InboxCanvas } from "./Canvas.tsx"
 import capture from "./capture.json"
 import { adapters, checkedAt, inboxNoise, publicNailCard, scores, sideBySide, stylists } from "./data.ts"
-import { Avatar, Bubble, Caption, Card, Count, Eyebrow, Phone, Rise, Scene, Source, Typed, t, useRise } from "./ui.tsx"
+import { Avatar, Bubble, Caption, Card, Count, Eyebrow, Phone, Rise, Scene, t, useRise } from "./ui.tsx"
 
 export const SCENES = { noise: 210, title: 120, canvas: CANVAS_FRAMES, closest: CLOSEST_FRAMES, thread: 270, learn: 450, mubit: 360, stylists: 270, close: 210 }
 export const TOTAL = Object.values(SCENES).reduce((a, b) => a + b, 0)
@@ -168,16 +168,16 @@ function Mubit() {
       <Flow at={90} y={430} nodes={bottom} accentIndex={2} accent />
       {braider && (
         <Rise at={170} style={{ position: "absolute", left: 120, top: 640, width: 1100 }}>
-          <div style={{ fontSize: 26, color: t.muted }}>Amara’s adapter {braider.version} on {braider.base}, trained on {braider.kept} kept examples</div>
+          <div style={{ fontSize: 26, color: t.muted }}><b style={{ color: t.accent }}>In progress.</b> Amara’s own model, {braider.version} on {braider.base}, trained on {braider.kept} of her kept examples</div>
           <div style={{ position: "relative", height: 22, borderRadius: 22, background: t.sunken, marginTop: 18 }}>
             <i style={{ position: "absolute", inset: 0, width: `${braider.quality}%`, borderRadius: 22, background: t.accent }} />
             <i style={{ position: "absolute", top: -8, bottom: -8, left: `${braider.target}%`, width: 3, background: t.ink }} />
           </div>
-          <div style={{ fontSize: 22, color: t.faint, marginTop: 14 }}>Matches the big model on {braider.quality}% of test cases, aiming for {braider.target}%. {braider.state}. Checked {checkedAt}.</div>
+          <div style={{ fontSize: 22, color: t.faint, marginTop: 14 }}>Matches the big model on {braider.quality}% of test cases, aiming for {braider.target}%. {braider.state}. Checked {checkedAt}.{braider.next ? ` ${braider.next}` : ""}</div>
         </Rise>
       )}
       <div style={{ position: "absolute", left: 120, top: 860, width: 1680 }}>
-        <Caption at={230}>Every fix she makes trains her own model.</Caption>
+        <Caption at={230}>Every fix improves the next draft today, and trains her own model over time.</Caption>
       </div>
     </Scene>
   )

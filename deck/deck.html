@@ -55,7 +55,7 @@
   <p class="eyebrow">Night Shift · London · October 2026 · built on Mubit</p>
   <h1>Brief Builder</h1>
   <p class="lead" style="font-size: 46px; color: var(--ink); margin-top: 36px">Turn “can u do these?” into a booking.</p>
-  <p class="lead">A stylist’s DM inbox that drafts priced replies in her voice, and learns from every fix she makes.</p>
+  <p class="lead">A stylist’s DM inbox that drafts priced replies in her voice, and learns from every fix she makes. Her fixes take fully right replies from <b style="color: var(--ink)">28% to 52%</b> on DMs it never trained on.</p>
   <div class="foot"><span>brief-builder.buy-ea2.workers.dev</span><span>github.com/machineyearningengineer/brief-builder</span></div>
 </section>
 
@@ -106,6 +106,20 @@
 </section>
 
 <section class="slide">
+  <p class="eyebrow">Results · locked test DMs, never sent to Mubit for training</p>
+  <h2>Her fixes nearly double the replies it gets fully right.</h2>
+  <div style="margin-top: 56px">
+    <table>
+      <tr><th>Stylist</th><th>Test DMs</th><th style="width: 640px"></th><th>Plain model</th><th>With her fixes</th></tr>
+      <tr><td>Amara Braids, braider</td><td class="muted">60</td><td><div class="bar"><i style="width: 52%"></i><s style="left: 28%"></s></div></td><td class="n muted">28%</td><td class="n accent">52%</td></tr>
+      <tr><td>Lived-in Colour, colourist</td><td class="muted">20</td><td><div class="bar"><i style="width: 35%"></i><s style="left: 0%"></s></div></td><td class="n muted">0%</td><td class="n accent">35%</td></tr>
+      <tr><td>Gloss by Jade, nail tech</td><td class="muted">24</td><td><div class="bar"><i style="width: 58%"></i><s style="left: 29%"></s></div></td><td class="n muted">29%</td><td class="n accent">58%</td></tr>
+    </table>
+    <p class="muted" style="margin-top: 34px; font-size: 26px">Fully right means every field of the brief matches the label. Braider, offering times instead of booking: 26% → 67%. Right next step: 65% → 83%.</p>
+  </div>
+</section>
+
+<section class="slide">
   <p class="eyebrow">It learns from her</p>
   <h2>The next client gets it right first time. In her voice.</h2>
   <div class="row" style="grid-template-columns: 1.55fr 1fr">
@@ -131,23 +145,11 @@
   </div>
 </section>
 
-<section class="slide">
-  <p class="eyebrow">Results · locked test DMs, never sent to Mubit for training</p>
-  <h2>Her fixes nearly double the replies it gets fully right.</h2>
-  <div style="margin-top: 56px">
-    <table>
-      <tr><th>Stylist</th><th>Test DMs</th><th style="width: 640px"></th><th>Plain model</th><th>With her fixes</th></tr>
-      <tr><td>Amara Braids, braider</td><td class="muted">60</td><td><div class="bar"><i style="width: 52%"></i><s style="left: 28%"></s></div></td><td class="n muted">28%</td><td class="n accent">52%</td></tr>
-      <tr><td>Lived-in Colour, colourist</td><td class="muted">20</td><td><div class="bar"><i style="width: 35%"></i><s style="left: 0%"></s></div></td><td class="n muted">0%</td><td class="n accent">35%</td></tr>
-      <tr><td>Gloss by Jade, nail tech</td><td class="muted">24</td><td><div class="bar"><i style="width: 58%"></i><s style="left: 29%"></s></div></td><td class="n muted">29%</td><td class="n accent">58%</td></tr>
-    </table>
-    <p class="muted" style="margin-top: 34px; font-size: 26px">Fully right means every field of the brief matches the label. Braider, offering times instead of booking: 26% → 67%. Right next step: 65% → 83%.</p>
-  </div>
-</section>
+
 
 <section class="slide">
   <p class="eyebrow">Use of Mubit</p>
-  <h2>Every fix she makes trains her own model.</h2>
+  <h2>Every fix improves the next draft today. Mubit trains them into her own model.</h2>
   <div style="margin-top: 60px; display: grid; gap: 26px">
     <div class="flow">
       <div class="node">Client DM<small>text and photos</small></div>
@@ -159,12 +161,14 @@
       <div class="node">Her fix<small>one tap on the sheet</small></div>
       <div class="node">Re-drafted call<small>through Mubit, with her fix</small></div>
       <div class="node">Kept example<small>her corrected answer</small></div>
-      <div class="node hot">Her adapter<small>v1 on Qwen3-4B, braider 50% and colourist 33% of target</small></div>
+      <div class="node hot">Her own model · in progress<small>v1 on Qwen3-4B: braider 50%, colourist 33% of the way to the 95% target</small></div>
     </div>
   </div>
   <ul class="points" style="margin-top: 40px; grid-template-columns: 1fr 1fr; display: grid; column-gap: 60px">
     <li>The instructions depend only on her profile, so each stylist is one Mubit task.</li>
     <li>Test runs and comparison drafts send <b>x-middleware-record: off</b>: never training data.</li>
+    <li>Today: her fixes guide the next drafts straight away: 28% to 52% fully right on the locked test.</li>
+    <li>Over time: each version is graded against gpt-6-luna; one that passes can be compared in Mubit’s Try models.</li>
   </ul>
 </section>
 
