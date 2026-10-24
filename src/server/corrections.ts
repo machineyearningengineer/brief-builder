@@ -34,6 +34,37 @@ export function closestCorrections(text: string, pool: Correction[], k = 3): Cor
     .map((s) => s.c)
 }
 
+// One time she rewrote a draft before sending it: the clearest record of how she talks.
+export type VoiceEdit = { dm: string; draft: string; sent: string }
+
+export function closestVoice(text: string, pool: VoiceEdit[], k = 2): VoiceEdit[] {
+  const q = words(text)
+  const scored = pool.map((v, i) => {
+    const w = words(v.dm)
+    let shared = 0
+    for (const x of q) if (w.has(x)) shared++
+    // Newer edits win ties: her voice now matters more than her voice last month.
+    return { v, score: shared / Math.sqrt(q.size * w.size || 1) + i * 1e-6 }
+  })
+  return scored.sort((a, b) => b.score - a.score).slice(0, k).map((s) => s.v)
+}
+
+export function voiceBlock(vs: VoiceEdit[]): string {
+  if (!vs.length) return ""
+  const shown = vs.map((v) => `- DM: ${JSON.stringify(v.dm)}\n  Draft: ${JSON.stringify(v.draft)}\n  She sent: ${JSON.stringify(v.sent)}`)
+  return `\n\nHow this stylist rewrites drafts before sending. Write reply_draft the way she does (greeting, tone, emoji, sign-off), keeping the prices and facts from the brief:\n${shown.join("\n")}`
+}
+
+// Word-level share of a draft the stylist changed: 0 when sent as drafted, 1 when rewritten.
+export function editShare(draft: string, sent: string): number {
+  const a = draft.toLowerCase().split(/\s+/).filter(Boolean)
+  const b = sent.toLowerCase().split(/\s+/).filter(Boolean)
+  if (!a.length && !b.length) return 0
+  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1])
+  return Math.round((1 - (2 * dp[a.length][b.length]) / (a.length + b.length)) * 100) / 100
+}
+
 export function correctionsBlock(cs: Correction[]): string {
   if (!cs.length) return ""
   const shown = cs.map((c) => {

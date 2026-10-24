@@ -158,6 +158,12 @@ function ChatPage() {
                 <p className="bubble in">{m.reply}</p>
               </div>
             )}
+            {m.extra?.map((x, i) => (
+              <div key={i} className="from-them rise">
+                <span className="avatar small" aria-hidden="true">{info.name.slice(0, 1)}</span>
+                <p className="bubble in">{x}</p>
+              </div>
+            ))}
           </div>
         ))}
         {last && !last.reply && <p className="receipt">Delivered · {time(last.createdAt)}</p>}

@@ -88,3 +88,17 @@ export function carryForward(brief: Record<string, any>, before: Record<string, 
   }
   return carried
 }
+
+// What the conversation has settled so far, said plainly to the model so a follow-up builds on
+// it instead of asking again. The stylist's fixes count even though the client never typed them.
+export function settledBlock(before: Record<string, any> | null): string {
+  if (!before) return ""
+  const known = scalarPaths.flatMap((path) => {
+    const v = getPath(before, path)
+    return v === undefined || v === "unknown" ? [] : [`${path}=${v}`]
+  })
+  if (Array.isArray(before.look?.extras) && before.look.extras.length) known.push(`look.extras=${before.look.extras.join("+")}`)
+  if (Array.isArray(before.look?.art) && before.look.art.length) known.push(`look.art=${before.look.art.join("+")}`)
+  if (before.service && before.service !== "unknown") known.unshift(`service=${before.service}`)
+  return known.length ? `\n\nAlready settled in this conversation (by the client, the photo or the stylist). Use these and don't ask for them again unless the new DM changes them: ${[...new Set(known)].join(", ")}` : ""
+}

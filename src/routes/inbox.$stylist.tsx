@@ -309,6 +309,7 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
     const ev = m.brief?.evidence?.[path]
     if (ev === '[photo]') {
       const t = m.photoTags?.find((x) => x.field === path.split('.').pop())
+      if (t?.via === 'fix') return 'Like a photo you fixed'
       return t ? `From photo · ${Math.round(t.confidence * 100)}%` : 'From photo'
     }
     return ev ? `“${clip(String(ev), 26)}”` : ''
@@ -385,9 +386,11 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
               {t.text && <p className="bubble in">{highlight(t.text, Object.values(brief?.evidence ?? {}) as string[])}</p>}
               {t.status === 'drafting' && <p className="muted typing"><span className="dots"><i /><i /><i /></span> Reading the message{t.images.length ? ' and photo' : ''}</p>}
               {t.reply && <p className="bubble out rise">{t.reply}</p>}
+              {t.extra.map((x, i) => <p key={i} className="bubble out rise">{x}</p>)}
             </div>
           ))}
         </div>
+        <PriceCorrection m={m} stylist={stylist} token={token} />
         {!m.reply && saved && (
           <form className="reply" onSubmit={(e) => { e.preventDefault(); void send() }}>
             <label htmlFor="reply" className="eyebrow">{m.redrafting ? 'Updating the reply from your fix' : 'Draft reply'}</label>
@@ -478,6 +481,31 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
 }
 
 // Marks each evidence quote where it appears in the DM, so every value shows its source.
+// After a reply has gone, a fix that changes the price offers the client a one-tap correction.
+function PriceCorrection({ m, stylist, token }: { m: RoomMessage; stylist: StylistKey; token: string }) {
+  const now = estimate(stylist, m.corrected ?? m.brief)?.amount
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+  const offered = !!m.reply && m.sentPrice != null && now != null && now !== m.sentPrice
+  useEffect(() => {
+    if (offered) setText(`Quick correction, sorry! It's £${now}, not £${m.sentPrice}.`)
+  }, [offered, now, m.sentPrice])
+  if (!offered) return null
+  const send = async () => {
+    setSending(true)
+    try { await post(stylist, 'reply', { id: m.id, text, append: true }, token) } finally { setSending(false) }
+  }
+  return (
+    <form className="correction rise" onSubmit={(e) => { e.preventDefault(); void send() }}>
+      <p><b>You told them £{m.sentPrice}.</b> With your fix it’s £{now}.</p>
+      <div className="reply-box">
+        <textarea rows={2} value={text} onChange={(e) => setText(e.target.value)} aria-label="Correction to send" />
+        <button type="submit" className="send on" disabled={!text.trim() || sending} aria-label="Send correction"><SendIcon /></button>
+      </div>
+    </form>
+  )
+}
+
 function highlight(text: string, quotes: string[]) {
   const spans: [number, number][] = []
   const lower = text.toLowerCase()
@@ -574,6 +602,8 @@ const CSS = `
 .seg button:hover { border-color: var(--faint); color: var(--ink); }
 .seg button.on { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 600; }
 .line.fixed .seg button.on { background: var(--good); border-color: var(--good); color: var(--bg); }
+.correction { margin: 0 16px 12px; padding: 14px 16px; border-radius: var(--radius); background: var(--accent-soft); display: grid; gap: 10px; }
+.correction p { margin: 0; }
 .extras .v { gap: 6px; }
 .chip { border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 5px 9px; font-size: 13.5px; font-weight: 600; min-height: 32px; }
 .chip.added { border-color: var(--good); color: var(--good); }

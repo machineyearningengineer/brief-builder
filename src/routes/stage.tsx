@@ -139,10 +139,26 @@ function Stage() {
             <p className="muted">Matches the big model on {adapter.quality}% of {adapter.tests} test cases (target {adapter.target}%). {adapter.state}. Checked {mubit.checkedAt}.</p>
           </div>
         )}
+        <VoiceLine messages={messages} name={STYLISTS[stylist].name.split(' ')[0]} />
         <p className="count"><b>{fixes}</b> fixes this session · each one recorded by Mubit for the adapter</p>
       </section>
       <style>{STAGE_CSS}</style>
     </main>
+  )
+}
+
+// How much of each draft she rewrote before sending, oldest to newest: falls as it learns her voice.
+function VoiceLine({ messages, name }: { messages: RoomMessage[]; name: string }) {
+  const shares = messages.filter((m) => m.editShare != null).map((m) => m.editShare!)
+  if (shares.length < 2) return null
+  const first = Math.round(shares[0] * 100)
+  const last = Math.round(shares.at(-1)! * 100)
+  return (
+    <div className="voice">
+      <p className="eyebrow">How much {name} rewrites each draft</p>
+      <div className="bars">{shares.slice(-12).map((v, i) => <i key={i} style={{ height: `${Math.max(4, v * 100)}%` }} />)}</div>
+      <p className="muted">{first}% of the first draft · {last}% of the latest</p>
+    </div>
   )
 }
 
@@ -224,6 +240,9 @@ const STAGE_CSS = `
 .stage-photo { width: 120px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; float: right; margin-left: 12px; }
 .fixline { border-left: 3px solid var(--good); border-radius: 0; padding: 6px 12px; background: var(--good-soft); font-size: 16px; }
 .fixline b { color: var(--good); margin-right: 6px; }
+.voice { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 8px; background: var(--surface); }
+.voice .bars { display: flex; align-items: flex-end; gap: 6px; height: 56px; }
+.voice .bars i { flex: 1; border-radius: 4px; background: var(--accent); transition: height 400ms var(--ease); }
 .mubit { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 6px; background: var(--surface); }
 .mubit p { margin: 0; }
 .meter { position: relative; height: 10px; border-radius: 5px; background: var(--sunken); overflow: visible; }

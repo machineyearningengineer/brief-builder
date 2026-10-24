@@ -13,19 +13,24 @@ import colouristCorrections from "../../data/colourist/corrections.jsonl?raw"
 import nailsProfile from "../../data/nails/profile.json"
 import nailsTags from "../../data/nails/tags.json"
 import nailsCorrections from "../../data/nails/corrections.jsonl?raw"
+import braiderVoice from "../../data/braider/voice.jsonl?raw"
+import colouristVoice from "../../data/colourist/voice.jsonl?raw"
+import nailsVoice from "../../data/nails/voice.jsonl?raw"
+import { estimate } from "../shared/pricing.ts"
 import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
-import { closestCorrections, correctionsBlock, type Correction } from "./corrections.ts"
-import { applyTrustedPhotoTags, carryForward, guardEvidence } from "./guards.ts"
+import { closestCorrections, closestVoice, correctionsBlock, editShare, voiceBlock, type Correction, type VoiceEdit } from "./corrections.ts"
+import { applyTrustedPhotoTags, carryForward, guardEvidence, settledBlock } from "./guards.ts"
 import { readPhotos, type ReaderFix } from "./photo-reader.ts"
 
 const PROFILES = {
-  braider: { profile: braiderProfile, tags: braiderTags, seedCorrections: braiderCorrections },
-  colourist: { profile: colouristProfile, tags: colouristTags, seedCorrections: colouristCorrections },
-  nails: { profile: nailsProfile, tags: nailsTags, seedCorrections: nailsCorrections },
+  braider: { profile: braiderProfile, tags: braiderTags, seedCorrections: braiderCorrections, seedVoice: braiderVoice },
+  colourist: { profile: colouristProfile, tags: colouristTags, seedCorrections: colouristCorrections, seedVoice: colouristVoice },
+  nails: { profile: nailsProfile, tags: nailsTags, seedCorrections: nailsCorrections, seedVoice: nailsVoice },
 } as const
 
-const parseJsonl = (s: string): Correction[] => s.trim() ? s.trim().split("\n").map((l) => JSON.parse(l)) : []
+const parseJsonl = <T = Correction>(s: string): T[] => s.trim() ? s.trim().split("\n").map((l) => JSON.parse(l)) : []
+const PHOTO_LIKENESS = 0.5
 const MAX_DM = 1000
 const MAX_CORRECTION_BYTES = 8_000
 const DM_PER_WINDOW = 8
@@ -43,6 +48,7 @@ const CLIENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 // What a client's phone may see of a message: their words, its status and the stylist's reply.
 const clientView = (m: RoomMessage): RoomMessage => ({
   ...m, photoTags: null, brief: null, corrected: null, changed: [], requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null, redrafting: false,
+  editShare: null, sentPrice: null,
 })
 
 export class StylistRoom extends DurableObject<Env> {
@@ -59,11 +65,18 @@ export class StylistRoom extends DurableObject<Env> {
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, client_id TEXT, mime TEXT, bytes BLOB, created_at INTEGER)`)
     // When the stylist changes something the photo reader said: what it said, what's right.
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS reader_fixes (field TEXT, said TEXT, now TEXT, created_at INTEGER)`)
+    // Every time the stylist rewrote a draft before sending it.
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS voice (id TEXT PRIMARY KEY, dm TEXT, draft TEXT, sent TEXT, created_at INTEGER)`)
+    // A photo fix remembers the rest of that photo's tags, so it only applies to photos like it.
+    if (!ctx.storage.sql.exec(`PRAGMA table_info(reader_fixes)`).toArray().some((c) => c.name === "sig")) ctx.storage.sql.exec(`ALTER TABLE reader_fixes ADD COLUMN sig TEXT`)
     // Rooms created before photos existed get the column in place.
     const cols = ctx.storage.sql.exec(`PRAGMA table_info(messages)`).toArray().map((c) => c.name)
     if (!cols.includes("images")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN images TEXT`)
     if (!cols.includes("baseline")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN baseline TEXT`)
     if (!cols.includes("redrafting")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN redrafting INTEGER`)
+    if (!cols.includes("edit_share")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN edit_share REAL`)
+    if (!cols.includes("sent_price")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN sent_price INTEGER`)
+    if (!cols.includes("extra")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN extra TEXT`)
     const row = ctx.storage.sql.exec(`SELECT value FROM meta WHERE key = 'stylist'`).toArray()[0]
     if (row) this.stylist = row.value as StylistKey
   }
@@ -149,10 +162,10 @@ export class StylistRoom extends DurableObject<Env> {
   private save(m: RoomMessage) {
     this.ctx.storage.sql.exec(
       `INSERT OR REPLACE INTO messages (id, client_id, created_at, received_at, text, photo, status, brief, corrected, changed,
-        reply, request_id, ms, corrections_used, guarded, images, baseline, redrafting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reply, request_id, ms, corrections_used, guarded, images, baseline, redrafting, edit_share, sent_price, extra) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       m.id, m.clientId, m.createdAt, m.receivedAt, m.text, JSON.stringify(m.photoTags), m.status, JSON.stringify(m.brief),
       JSON.stringify(m.corrected), JSON.stringify(m.changed), m.reply, m.requestId, m.ms, m.correctionsUsed, JSON.stringify(m.guarded),
-      JSON.stringify(m.images), JSON.stringify(m.baseline), m.redrafting ? 1 : 0,
+      JSON.stringify(m.images), JSON.stringify(m.baseline), m.redrafting ? 1 : 0, m.editShare, m.sentPrice, JSON.stringify(m.extra ?? []),
     )
     this.broadcast({ type: "message", message: m })
   }
@@ -166,12 +179,37 @@ export class StylistRoom extends DurableObject<Env> {
       .slice(-6)
       .map((x) => {
         const b = { ...(x.corrected ?? x.brief)! }
+        // The client only saw what she sent; a draft she never sent isn't part of the conversation.
         if (x.reply) b.reply_draft = x.reply
+        else delete b.reply_draft
         // A photo tag the turn's final brief contradicts (the stylist fixed it) isn't resent,
         // so the model can't pick the reader's guess over her fix.
         const tags = x.photoTags?.filter((t) => agrees(b, t)) ?? null
         return { dm: { received_at: x.receivedAt, text: x.text, photo: tags ? { reader_output: tags } : null }, brief: b }
       })
+  }
+
+  // Photo fixes she made on photos that look like this one (most of their other tags agree):
+  // the tag she corrected is swapped for hers. A fix on a different-looking photo changes nothing.
+  private applySimilarFixes(tags: RoomMessage["photoTags"]): RoomMessage["photoTags"] {
+    if (!tags) return tags
+    const rows = this.ctx.storage.sql.exec(`SELECT field, said, now, sig FROM reader_fixes WHERE sig IS NOT NULL ORDER BY created_at DESC LIMIT 40`).toArray()
+    let out = tags
+    for (const r of rows) {
+      const field = r.field as string
+      if (!out.some((t) => t.field === field && t.tag === r.said)) continue
+      const theirs = new Set(JSON.parse(r.sig as string) as string[])
+      const ours = new Set(out.filter((t) => t.field !== field).map((t) => `${t.field}=${t.tag}`))
+      const shared = [...ours].filter((x) => theirs.has(x)).length
+      if (shared / (new Set([...ours, ...theirs]).size || 1) < PHOTO_LIKENESS) continue
+      out = out.flatMap((t) => (t.field === field && t.tag === r.said ? (r.now === "none" || r.now === "unknown" ? [] : [{ ...t, tag: r.now as string, via: "fix" as const }]) : [t]))
+    }
+    return out
+  }
+
+  private voicePool(): VoiceEdit[] {
+    const live = this.ctx.storage.sql.exec(`SELECT dm, draft, sent FROM voice ORDER BY created_at`).toArray() as unknown as VoiceEdit[]
+    return [...parseJsonl<VoiceEdit>(PROFILES[this.stylist!].seedVoice), ...live]
   }
 
   // The stylist's most recent photo corrections, one per field and wrong tag.
@@ -224,7 +262,7 @@ export class StylistRoom extends DurableObject<Env> {
       id: crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
       receivedAt: londonTimestamp(new Date()), text, photoTags: null, images, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
-      redrafting: false,
+      redrafting: false, editShare: null, sentPrice: null, extra: [],
     }
     this.save(m)
     if (draft) this.ctx.waitUntil(this.draft(m))
@@ -240,7 +278,8 @@ export class StylistRoom extends DurableObject<Env> {
         const r = this.ctx.storage.sql.exec(`SELECT mime, bytes FROM images WHERE id = ?`, id).toArray()[0]
         return r ? [{ mime: r.mime as string, bytes: r.bytes as ArrayBuffer }] : []
       })
-      m = { ...m, photoTags: await readPhotos({ key: this.env.MUBIT_API_KEY, tags: tags as any, photos, fixes: this.readerFixes() }).catch(() => null) }
+      const read = await readPhotos({ key: this.env.MUBIT_API_KEY, tags: tags as any, photos, fixes: this.readerFixes() }).catch(() => null)
+      m = { ...m, photoTags: this.applySimilarFixes(read) }
       this.save(m)
     }
     const used = closestCorrections(m.text, this.correctionPool())
@@ -251,7 +290,7 @@ export class StylistRoom extends DurableObject<Env> {
     // the before-and-after. The plain call is never recorded, so it can't train the adapter.
     // Both see the client's conversation so far, so a follow-up continues the same brief.
     const [result, plain] = await Promise.all([
-      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, corrections: correctionsBlock(used) }).catch(failed),
+      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, corrections: correctionsBlock(used) + voiceBlock(closestVoice(m.text, this.voicePool())) + settledBlock(history.at(-1)?.brief ?? null) }).catch(failed),
       callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, record: "off" }).catch(failed),
     ])
     const plainBrief = plain.brief as Record<string, any> | null
@@ -263,9 +302,7 @@ export class StylistRoom extends DurableObject<Env> {
     const threadTags = [...history.flatMap((h) => h.dm.photo?.reader_output ?? []), ...(m.photoTags ?? [])]
     const trusted = new Set(threadTags.filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
     if (brief && threadTags.length) {
-      // A tag the stylist has corrected away is never put back by the photo rule.
-      const vetoed = new Set(this.readerFixes().map((f) => `${f.field}:${f.said}`))
-      applyTrustedPhotoTags(brief, threadTags.filter((t) => !vetoed.has(`${t.field}:${t.tag}`)), (tags as any).trust_threshold)
+      applyTrustedPhotoTags(brief, threadTags, (tags as any).trust_threshold)
       // A field the photo now answers is no longer something to ask about.
       if (Array.isArray(brief.missing)) brief.missing = brief.missing.filter((k: string) => brief.look?.[k] === undefined || brief.look[k] === "unknown")
     }
@@ -297,10 +334,18 @@ export class StylistRoom extends DurableObject<Env> {
     }
     this.ctx.storage.sql.exec(`INSERT OR REPLACE INTO corrections VALUES (?, ?, ?)`, m.id, JSON.stringify(correction), Date.now())
     for (const f of readerFixes(m.photoTags, m.brief, body.corrected, (PROFILES[this.stylist!].tags as any).trust_threshold)) {
-      this.ctx.storage.sql.exec(`INSERT INTO reader_fixes VALUES (?, ?, ?, ?)`, f.field, f.said, f.now, Date.now())
+      const sig = (m.photoTags ?? []).filter((t) => t.field !== f.field).map((t) => `${t.field}=${t.tag}`)
+      this.ctx.storage.sql.exec(`INSERT INTO reader_fixes VALUES (?, ?, ?, ?, ?)`, f.field, f.said, f.now, Date.now(), JSON.stringify(sig))
     }
     this.save({ ...m, corrected: body.corrected, changed, redrafting: !m.reply })
-    if (!m.reply) this.ctx.waitUntil(this.redraft(m.id))
+    // Later messages in this thread that she hasn't answered yet are drafted again on top of the
+    // fix, in order, after this one's reply is re-drafted.
+    const later = this.messages().filter((x) => x.clientId === m.clientId && x.createdAt > m.createdAt && !x.reply && x.status === "drafted")
+    for (const x of later) this.save({ ...x, status: "drafting" })
+    this.ctx.waitUntil((async () => {
+      if (!m.reply) await this.redraft(m.id)
+      for (const x of later) { const fresh = this.message(x.id); if (fresh) await this.draft(fresh) }
+    })())
     return Response.json({ changed })
   }
 
@@ -318,7 +363,7 @@ export class StylistRoom extends DurableObject<Env> {
     const result = await callBrief({
       key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low",
       dm: { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null },
-      corrections: correctionsBlock([...own, ...others]),
+      corrections: correctionsBlock([...own, ...others]) + voiceBlock(closestVoice(m.text, this.voicePool())),
       history: this.history(m),
     }).catch(() => null)
     const latest = this.message(id)
@@ -328,11 +373,24 @@ export class StylistRoom extends DurableObject<Env> {
     this.save({ ...latest, corrected, redrafting: false })
   }
 
-  private async reply(body: { id?: string; text?: string }) {
+  private async reply(body: { id?: string; text?: string; append?: boolean }) {
     const m = body.id ? this.message(body.id) : null
     const text = String(body.text ?? "").trim().slice(0, MAX_DM)
     if (!m || !text) return Response.json({ error: "A reply needs text." }, { status: 400 })
-    this.save({ ...m, reply: text, status: "replied" })
+    // A follow-up after the reply, such as a price correction.
+    if (body.append) {
+      if (!m.reply) return Response.json({ error: "Send the reply first." }, { status: 400 })
+      this.save({ ...m, extra: [...m.extra, text].slice(-4), sentPrice: estimate(this.stylist!, m.corrected ?? m.brief)?.amount ?? m.sentPrice })
+      return Response.json({ ok: true })
+    }
+    const final = m.corrected ?? m.brief
+    const draft = typeof final?.reply_draft === "string" ? final.reply_draft : null
+    const share = draft ? editShare(draft, text) : null
+    // A real rewrite is how she talks; a typo fix isn't worth learning from.
+    if (draft && share !== null && share >= 0.1) {
+      this.ctx.storage.sql.exec(`INSERT OR REPLACE INTO voice VALUES (?, ?, ?, ?, ?)`, m.id, m.text, draft, text, Date.now())
+    }
+    this.save({ ...m, reply: text, status: "replied", editShare: share, sentPrice: estimate(this.stylist!, final)?.amount ?? null })
     return Response.json({ ok: true })
   }
 
@@ -460,6 +518,7 @@ function toMessage(r: Record<string, any>): RoomMessage {
     photoTags: JSON.parse(r.photo), status: r.status, brief: JSON.parse(r.brief), corrected: JSON.parse(r.corrected),
     changed: JSON.parse(r.changed ?? "[]"), reply: r.reply, requestId: r.request_id, ms: r.ms,
     correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [], baseline: JSON.parse(r.baseline ?? "null"), redrafting: !!r.redrafting,
+    editShare: r.edit_share ?? null, sentPrice: r.sent_price ?? null, extra: JSON.parse(r.extra ?? "[]") ?? [],
   }
 }
 

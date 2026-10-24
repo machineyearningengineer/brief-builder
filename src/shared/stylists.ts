@@ -14,7 +14,8 @@ export type RoomMessage = {
   createdAt: number
   receivedAt: string
   text: string
-  photoTags: { field: string; tag: string; confidence: number }[] | null
+  // via "fix": the stylist corrected this on a photo that looked like this one.
+  photoTags: { field: string; tag: string; confidence: number; via?: "fix" }[] | null
   // Ids of photos the client attached, served by /api/room/<stylist>/image/<id>.
   images: string[]
   status: "drafting" | "drafted" | "failed" | "replied"
@@ -31,6 +32,12 @@ export type RoomMessage = {
   baseline: { reply: string; nextAction: string; ms: number } | null
   // True while the reply is being re-drafted from the stylist's corrected brief.
   redrafting: boolean
+  // How much of the draft she rewrote before sending, 0 (sent as drafted) to 1, and the price
+  // the sent reply was based on, so a later fix can offer the client a correction.
+  editShare: number | null
+  sentPrice: number | null
+  // Messages she sent after the reply, such as a price correction.
+  extra: string[]
 }
 
 export type RoomEvent = { type: "message"; message: RoomMessage } | { type: "reset" }

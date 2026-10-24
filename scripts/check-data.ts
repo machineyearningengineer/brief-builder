@@ -13,7 +13,7 @@ let rows = 0
 
 for (const stylist of ["braider", "colourist", "nails"] as const) {
   // seeds.jsonl is the prep source for train.jsonl's first rows, so it isn't loaded by the app.
-  for (const file of readdirSync(join(DATA, stylist)).filter((f) => f.endsWith(".jsonl") && f !== "seeds.jsonl" && f !== "corrections.jsonl")) {
+  for (const file of readdirSync(join(DATA, stylist)).filter((f) => f.endsWith(".jsonl") && !["seeds.jsonl", "corrections.jsonl", "voice.jsonl"].includes(f))) {
     const lines = readFileSync(join(DATA, stylist, file), "utf8").trim().split("\n")
     lines.forEach((line, i) => {
       rows++
