@@ -438,6 +438,7 @@ export class StylistRoom extends DurableObject<Env> {
     this.ctx.storage.sql.exec(`DELETE FROM corrections`)
     this.ctx.storage.sql.exec(`DELETE FROM images`)
     this.ctx.storage.sql.exec(`DELETE FROM reader_fixes`)
+    this.ctx.storage.sql.exec(`DELETE FROM voice`)
     this.broadcast({ type: "reset" })
     return Response.json({ ok: true })
   }
