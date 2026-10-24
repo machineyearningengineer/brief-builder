@@ -59,8 +59,8 @@ Locked test DMs, never sent to Mubit for training. Fully right means every field
 
 | Stylist | Test DMs | Plain model | With her fixes | + her rules in code |
 | --- | --- | --- | --- | --- |
-| Amara Braids, braider | 60 | 30% | 53% | **72%** |
-| Lived-in Colour, colourist | 20 | 15% | 60% | **85%** |
+| Amara Braids, braider | 60 | 30% | 53% | **87%** |
+| Lived-in Colour, colourist | 20 | 15% | 60% | **90%** |
 | Gloss by Jade, nail tech | 24 | 25% | 50% | **92%** |
 
 Her rules in code decide the next step, what’s missing, dates from day words and time windows

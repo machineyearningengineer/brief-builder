@@ -55,7 +55,7 @@
   <p class="eyebrow">Night Shift · London · October 2026 · built on Mubit</p>
   <h1>Brief Builder</h1>
   <p class="lead" style="font-size: 46px; color: var(--ink); margin-top: 36px">Turn “can u do these?” into a booking.</p>
-  <p class="lead">A stylist’s DM inbox that drafts priced replies in her voice, and learns from every fix she makes. Fully right replies go from <b style="color: var(--ink)">30% to 72%</b> on DMs it never trained on.</p>
+  <p class="lead">A stylist’s DM inbox that drafts priced replies in her voice, and learns from every fix she makes. Fully right replies go from <b style="color: var(--ink)">30% to 87%</b> on DMs it never trained on.</p>
   <div class="foot"><span>brief-builder.buy-ea2.workers.dev</span><span>github.com/machineyearningengineer/brief-builder</span></div>
 </section>
 
@@ -108,15 +108,15 @@
 
 <section class="slide">
   <p class="eyebrow">Results · locked test DMs, never sent to Mubit for training</p>
-  <h2>From under a third of replies fully right to <span class="accent">72–92%</span>.</h2>
+  <h2>From under a third of replies fully right to <span class="accent">87–92%</span>.</h2>
   <div style="margin-top: 56px">
     <table>
       <tr><th>Stylist</th><th>Test DMs</th><th style="width: 560px"></th><th>Plain model</th><th>Her fixes</th><th>+ her rules in code</th></tr>
-      <tr><td>Amara Braids, braider</td><td class="muted">60</td><td><div class="bar"><i style="width: 72%"></i><s style="left: 30%"></s></div></td><td class="n muted">30%</td><td class="n muted">53%</td><td class="n accent">72%</td></tr>
-      <tr><td>Lived-in Colour, colourist</td><td class="muted">20</td><td><div class="bar"><i style="width: 85%"></i><s style="left: 15%"></s></div></td><td class="n muted">15%</td><td class="n muted">60%</td><td class="n accent">85%</td></tr>
+      <tr><td>Amara Braids, braider</td><td class="muted">60</td><td><div class="bar"><i style="width: 87%"></i><s style="left: 30%"></s></div></td><td class="n muted">30%</td><td class="n muted">53%</td><td class="n accent">87%</td></tr>
+      <tr><td>Lived-in Colour, colourist</td><td class="muted">20</td><td><div class="bar"><i style="width: 90%"></i><s style="left: 15%"></s></div></td><td class="n muted">15%</td><td class="n muted">60%</td><td class="n accent">90%</td></tr>
       <tr><td>Gloss by Jade, nail tech</td><td class="muted">24</td><td><div class="bar"><i style="width: 92%"></i><s style="left: 25%"></s></div></td><td class="n muted">25%</td><td class="n muted">50%</td><td class="n accent">92%</td></tr>
     </table>
-    <p class="muted" style="margin-top: 34px; font-size: 26px">Fully right means every field of the brief matches the label. Her fixes guide the model; her rules in code decide the next step, what’s missing and the dates exactly. Checked on training data first, then scored once on the locked set.</p>
+    <p class="muted" style="margin-top: 34px; font-size: 26px">Fully right means every field of the brief matches the label. Her fixes guide the model; her rules in code decide the next step, what’s missing, the dates and any clash between photo and text exactly. Checked on training data first, then scored once on the locked set.</p>
   </div>
 </section>
 
@@ -154,7 +154,7 @@
   <div class="row" style="grid-template-columns: 1fr 1fr; align-items: stretch; margin-top: 64px">
     <div class="card" style="display: flex; flex-direction: column; gap: 22px; padding: 48px">
       <p class="eyebrow" style="margin: 0">Today</p>
-      <div style="font-family: var(--display); font-weight: 700; font-size: 120px; line-height: 1; letter-spacing: -0.03em"><span class="muted" style="font-size: 72px">30% →</span> <span class="accent">72%</span></div>
+      <div style="font-family: var(--display); font-weight: 700; font-size: 120px; line-height: 1; letter-spacing: -0.03em"><span class="muted" style="font-size: 72px">30% →</span> <span class="accent">87%</span></div>
       <p style="margin: 0; font-size: 32px; line-height: 1.35">Her fixes and rules shape the next draft straight away. Replies fully right on DMs it never trained on.</p>
     </div>
     <div class="card" style="display: flex; flex-direction: column; gap: 22px; padding: 48px; border-color: var(--accent)">

@@ -402,7 +402,7 @@ export class StylistRoom extends DurableObject<Env> {
     const carried = brief ? carryForward(brief, history.at(-1)?.brief ?? null, m.text) : []
     const stillCleared = guarded.filter((p) => !carried.includes(p))
     // Next step, what's missing, dates from day words and time windows are decided in code.
-    if (brief) decide(this.stylist!, brief, { text: m.text, received_at: m.receivedAt })
+    if (brief) decide(this.stylist!, brief, { text: m.text, received_at: m.receivedAt, photo: { reader_output: threadTags } })
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
