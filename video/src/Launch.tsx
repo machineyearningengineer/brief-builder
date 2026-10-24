@@ -1,23 +1,25 @@
 // The submission film: problem, product, the fix, the learning, Mubit, three stylists, close.
 import { AbsoluteFill, Img, Series, interpolate, staticFile, useCurrentFrame } from "remotion"
-import { adapters, checkedAt, hero, inboxNoise, scores, sideBySide, stylists } from "./data.ts"
+import { CANVAS_FRAMES, CLOSEST_FRAMES, ClosestYesScene, InboxCanvas } from "./Canvas.tsx"
+import capture from "./capture.json"
+import { adapters, checkedAt, inboxNoise, publicNailCard, scores, sideBySide, stylists } from "./data.ts"
 import { Avatar, Bubble, Caption, Card, Count, Eyebrow, Phone, Rise, Scene, Source, Typed, t, useRise } from "./ui.tsx"
 
-export const SCENES = { noise: 240, title: 120, brief: 540, fix: 390, thread: 330, learn: 480, mubit: 390, stylists: 300, close: 210 }
+export const SCENES = { noise: 210, title: 120, canvas: CANVAS_FRAMES, closest: CLOSEST_FRAMES, thread: 270, learn: 450, mubit: 360, stylists: 270, close: 210 }
 export const TOTAL = Object.values(SCENES).reduce((a, b) => a + b, 0)
 
-export function Launch() {
+export function Launch({ publicSafe = false }: { publicSafe?: boolean }) {
   return (
     <AbsoluteFill style={{ background: t.bg }}>
       <Series>
         <Series.Sequence durationInFrames={SCENES.noise}><Noise /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.title}><Title /></Series.Sequence>
-        <Series.Sequence durationInFrames={SCENES.brief}><BriefScene /></Series.Sequence>
-        <Series.Sequence durationInFrames={SCENES.fix}><FixScene /></Series.Sequence>
+        <Series.Sequence durationInFrames={SCENES.canvas}><InboxCanvas /></Series.Sequence>
+        <Series.Sequence durationInFrames={SCENES.closest}><ClosestYesScene /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.thread}><Thread /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.learn}><Learn /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.mubit}><Mubit /></Series.Sequence>
-        <Series.Sequence durationInFrames={SCENES.stylists}><Stylists /></Series.Sequence>
+        <Series.Sequence durationInFrames={SCENES.stylists}><Stylists publicSafe={publicSafe} /></Series.Sequence>
         <Series.Sequence durationInFrames={SCENES.close}><Close /></Series.Sequence>
       </Series>
     </AbsoluteFill>
@@ -75,145 +77,6 @@ function Title() {
   )
 }
 
-const SHEET_ROWS = [
-  { k: "Service", v: "Knotless", src: `From photo · ${hero.tags[0].conf}%` },
-  { k: "Length", v: "Bum length", src: `From photo · ${hero.tags[1].conf}%` },
-  { k: "Size", v: "Small", src: `From photo · ${hero.tags[2].conf}%` },
-  { k: "Hair", v: "Not included", src: "House rule 3" },
-  { k: "Day", v: "Saturday", src: "“saturday”" },
-]
-
-// 3. One DM becomes a brief and a reply.
-function BriefScene() {
-  return (
-    <Scene frames={SCENES.brief}>
-      <Rise at={0} style={{ position: "absolute", left: 120, top: 70 }}><Eyebrow>The stylist’s inbox</Eyebrow></Rise>
-      <div style={{ position: "absolute", left: 120, top: 120 }}>
-        <Phone title="bisi" sub="Message request">
-          <Bubble side="in" at={10} photo="knotless.webp" />
-          <Bubble side="in" at={26}>{hero.dm}</Bubble>
-          <PhotoTags at={70} />
-        </Phone>
-      </div>
-      <Sheet at={130} price={240} />
-      <Composer at={300} label="Draft reply" text={hero.firstReply} typeAt={318} />
-      <div style={{ position: "absolute", left: 640, top: 900 }}>
-        <Caption at={420}>Vague message in. Specific reply out.</Caption>
-      </div>
-    </Scene>
-  )
-}
-
-function PhotoTags({ at }: { at: number }) {
-  return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-      {hero.tags.map((tag, i) => (
-        <Rise key={tag.label} at={at + i * 12} y={10}>
-          <span style={{ display: "inline-block", padding: "7px 13px", borderRadius: 99, fontSize: 16, background: t.accentSoft, color: t.accent, fontWeight: 600 }}>{tag.label} · {tag.conf}%</span>
-        </Rise>
-      ))}
-    </div>
-  )
-}
-
-function Row({ at, k, v, src, highlight = 0 }: { at: number; k: string; v: React.ReactNode; src: React.ReactNode; highlight?: number }) {
-  return (
-    <Rise at={at} y={14}>
-      <div style={{ display: "grid", gridTemplateColumns: "170px 1fr auto", alignItems: "center", padding: "17px 0", borderBottom: `1px dashed ${t.line}`, background: `oklch(29% 0.06 348 / ${highlight * 0.6})`, margin: "0 -16px", paddingInline: 16, borderRadius: 12 }}>
-        <span style={{ color: t.muted, fontSize: 21 }}>{k}</span>
-        <span style={{ fontSize: 24, fontWeight: 600 }}>{v}</span>
-        {src}
-      </div>
-    </Rise>
-  )
-}
-
-function Sheet({ at, price, fix }: { at: number; price: number; fix?: { at: number } }) {
-  const f = useCurrentFrame()
-  const fixed = fix ? f >= fix.at : false
-  const glow = fix ? interpolate(f, [fix.at, fix.at + 8, fix.at + 50], [0, 1, 0.35], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0
-  return (
-    <Card style={{ position: "absolute", left: 660, top: 120, width: 640, padding: "30px 40px 26px" }}>
-      <Rise at={at - 10}><Eyebrow>Service sheet</Eyebrow></Rise>
-      {SHEET_ROWS.map((r, i) => {
-        if (fix && r.k === "Size") {
-          return <Row key={r.k} at={at + i * 20} k="Size" v={fixed ? "Smedium" : "Small"} src={fixed ? <Source tone="accent">Your fix · was small</Source> : <Source>{r.src}</Source>} highlight={glow} />
-        }
-        return <Row key={r.k} at={at + i * 20} k={r.k} v={r.v} src={<Source>{r.src}</Source>} />
-      })}
-      <Rise at={at + SHEET_ROWS.length * 20 + 10} y={14}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 22 }}>
-          <span style={{ color: t.muted, fontSize: 21 }}>Price</span>
-          <span style={{ fontFamily: t.display, fontWeight: 700, fontSize: 64, letterSpacing: "-0.02em" }}>
-            {fix ? <Count from={240} to={220} at={fix.at + 6} frames={24} prefix="£" /> : `£${price}`}
-          </span>
-          <Source>Her price list</Source>
-        </div>
-      </Rise>
-    </Card>
-  )
-}
-
-function Composer({ at, label, text, typeAt, busy }: { at: number; label: string; text: string; typeAt: number; busy?: { from: number; to: number } }) {
-  const f = useCurrentFrame()
-  const working = busy && f >= busy.from && f < busy.to
-  return (
-    <Rise at={at} style={{ position: "absolute", left: 1340, top: 120, width: 460 }}>
-      <Card style={{ padding: "28px 30px" }}>
-        <Eyebrow>{working ? "Re-drafting with your fix" : label}</Eyebrow>
-        <div style={{ marginTop: 16, fontSize: 25, lineHeight: 1.45, minHeight: 290, opacity: working ? 0.35 : 1 }}>
-          {f >= typeAt ? <Typed text={text} at={typeAt} /> : null}
-        </div>
-        <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
-          <span style={{ padding: "12px 26px", borderRadius: 99, background: t.accent, color: t.onAccent, fontWeight: 600, fontSize: 20 }}>Send</span>
-        </div>
-      </Card>
-    </Rise>
-  )
-}
-
-// 4. One tap fixes the photo reader, the price and the reply.
-function FixScene() {
-  const f = useCurrentFrame()
-  const tap = 58
-  const options = ["Small", "Smedium", "Medium", "Large"]
-  const chosen = f >= tap ? 1 : 0
-  const finger = interpolate(f, [18, tap - 6], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
-  const pulse = interpolate(f, [tap, tap + 18], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
-  const undo = interpolate(f, [tap + 10, tap + 160], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
-  return (
-    <Scene frames={SCENES.fix}>
-      <Rise at={0} style={{ position: "absolute", left: 120, top: 70 }}><Eyebrow>She can see they’re smedium</Eyebrow></Rise>
-      <div style={{ position: "absolute", left: 120, top: 120, width: 470 }}>
-        <Card style={{ padding: 26 }}>
-          <Img src={staticFile("knotless.webp")} style={{ width: "100%", height: 420, objectFit: "cover", borderRadius: 20 }} />
-          <div style={{ marginTop: 18, fontSize: 22, color: t.muted }}>Photo reader said <b style={{ color: t.ink }}>small · {hero.tags[2].conf}%</b></div>
-        </Card>
-        <Rise at={8} style={{ marginTop: 24 }}>
-          <Card style={{ padding: 10, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, position: "relative" }}>
-            {options.map((o, i) => (
-              <span key={o} style={{ textAlign: "center", padding: "16px 0", borderRadius: 18, fontSize: 20, fontWeight: 600, background: i === chosen ? t.accent : "transparent", color: i === chosen ? t.onAccent : t.muted }}>{o}</span>
-            ))}
-            <span style={{ position: "absolute", left: interpolate(finger, [0, 1], [380, 168]), top: interpolate(finger, [0, 1], [110, 30]), width: 46, height: 46, borderRadius: 46, background: "oklch(100% 0 0 / 0.85)", boxShadow: `0 0 0 ${pulse * 26}px oklch(100% 0 0 / ${0.35 * (1 - pulse)})`, opacity: f < 16 || f > tap + 40 ? 0 : 1 }} />
-          </Card>
-        </Rise>
-      </div>
-      <Sheet at={-200} price={240} fix={{ at: tap }} />
-      <Composer at={-200} label="Draft reply" text={hero.fixedReply} typeAt={tap + 70} busy={{ from: tap + 4, to: tap + 70 }} />
-      <Rise at={tap + 6} style={{ position: "absolute", left: 660, top: 760 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "16px 22px", borderRadius: 18, background: t.sunken, width: 640, opacity: undo > 0 ? 1 : 0.5 }}>
-          <span style={{ flex: 1, fontSize: 21 }}>Size changed to smedium</span>
-          <span style={{ fontWeight: 600, color: t.accent, fontSize: 21 }}>Undo</span>
-          <span style={{ width: 120, height: 6, borderRadius: 6, background: t.line, overflow: "hidden" }}><i style={{ display: "block", height: "100%", width: `${undo * 100}%`, background: t.accent }} /></span>
-        </div>
-      </Rise>
-      <div style={{ position: "absolute", left: 660, top: 880, width: 1150 }}>
-        <Caption at={250}>One tap. Every fix is kept.</Caption>
-      </div>
-    </Scene>
-  )
-}
-
 // 5. The client asks a follow-up; the brief carries on.
 function Thread() {
   return (
@@ -221,11 +84,11 @@ function Thread() {
       <div style={{ position: "absolute", left: 1180, top: 90 }}>
         <Phone title="Amara Braids" sub="Peckham">
           <Bubble side="out" at={-30} photo="knotless.webp" />
-          <Bubble side="out" at={-30}>{hero.dm}</Bubble>
-          <Bubble side="in" at={-30}>{hero.fixedReply}</Bubble>
-          <Bubble side="out" at={40}>{hero.followUp}</Bubble>
+          <Bubble side="out" at={-30}>{capture.hero.dm}</Bubble>
+          <Bubble side="in" at={-30}>{capture.hero.fixedReply}</Bubble>
+          <Bubble side="out" at={40}>{capture.followUp.dm}</Bubble>
           <Typing from={70} to={120} />
-          <Bubble side="in" at={120}>{hero.followUpReply}</Bubble>
+          <Bubble side="in" at={120}>{capture.followUp.reply}</Bubble>
         </Phone>
       </div>
       <div style={{ position: "absolute", left: 160, top: 380, width: 880 }}>
@@ -345,12 +208,12 @@ function Flow({ at, y, nodes, accentIndex, accent }: { at: number; y: number; no
 }
 
 // 8. Not just braids.
-function Stylists() {
+function Stylists({ publicSafe }: { publicSafe: boolean }) {
   return (
     <Scene frames={SCENES.stylists}>
       <div style={{ position: "absolute", left: 120, top: 70 }}><Caption at={0}>Her rules. Her prices. Her voice.</Caption></div>
       <div style={{ position: "absolute", left: 120, top: 280, width: 1680, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 36 }}>
-        {stylists.map((s, i) => (
+        {(publicSafe ? [...stylists.slice(0, 2), publicNailCard] : stylists).map((s, i) => (
           <Rise key={s.name} at={30 + i * 22}>
             <Card style={{ padding: 30, height: 600, display: "flex", flexDirection: "column", gap: 18 }}>
               <div style={{ display: "flex", gap: 14, alignItems: "center" }}>

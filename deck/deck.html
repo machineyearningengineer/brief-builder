@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Brief Builder · Night Shift</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* The app's own tokens, dark. One slide = one 16:9 page. */
+  :root {
+    --bg: oklch(13.5% 0.009 330); --surface: oklch(19% 0.011 330); --sunken: oklch(23% 0.012 330);
+    --ink: oklch(96% 0.006 340); --muted: oklch(72% 0.014 330); --faint: oklch(56% 0.014 330);
+    --line: oklch(29% 0.012 330); --accent: oklch(72% 0.15 348); --accent-soft: oklch(29% 0.06 348);
+    --on-accent: oklch(17% 0.03 348); --good: oklch(77% 0.13 152); --mark: oklch(42% 0.08 95);
+    --display: "Bricolage Grotesque", system-ui, sans-serif; --sans: "Inter", system-ui, sans-serif;
+  }
+  @page { size: 1920px 1080px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 400 28px/1.4 var(--sans); -webkit-font-smoothing: antialiased; }
+  .slide { width: 1920px; height: 1080px; padding: 96px 120px; position: relative; overflow: hidden; page-break-after: always; break-after: page; display: flex; flex-direction: column; }
+  .eyebrow { font-size: 20px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin: 0 0 22px; }
+  h1, h2 { font-family: var(--display); font-weight: 700; letter-spacing: -0.025em; margin: 0; text-wrap: balance; }
+  h1 { font-size: 150px; line-height: 0.98; }
+  h2 { font-size: 84px; line-height: 1.02; max-width: 1500px; }
+  p.lead { font-size: 36px; color: var(--muted); max-width: 1280px; margin: 28px 0 0; }
+  .accent { color: var(--accent); }
+  .row { display: grid; gap: 48px; flex: 1; align-items: center; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 30px; padding: 34px 38px; }
+  .shot { border-radius: 26px; border: 1px solid var(--line); box-shadow: 0 30px 90px oklch(0% 0 0 / 0.5); width: 100%; display: block; }
+  ul.points { list-style: none; padding: 0; margin: 0; display: grid; gap: 26px; }
+  ul.points li { padding-left: 34px; position: relative; font-size: 31px; line-height: 1.38; }
+  ul.points li::before { content: ""; position: absolute; left: 0; top: 16px; width: 12px; height: 12px; border-radius: 12px; background: var(--accent); }
+  ul.points b { color: var(--ink); }
+  .muted { color: var(--muted); }
+  .foot { position: absolute; left: 120px; right: 120px; bottom: 54px; display: flex; justify-content: space-between; font-size: 20px; color: var(--faint); }
+  .bubble { display: inline-block; padding: 16px 22px; border-radius: 26px; background: var(--sunken); font-size: 28px; }
+  .bubble.out { background: var(--accent); color: var(--on-accent); }
+  table { border-collapse: collapse; width: 100%; font-size: 34px; }
+  th { text-align: left; font-size: 20px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); padding: 0 0 18px; }
+  td { padding: 22px 0; border-top: 1px dashed var(--line); }
+  td.n { font-family: var(--display); font-weight: 700; font-size: 52px; }
+  .bar { height: 18px; border-radius: 18px; background: var(--sunken); position: relative; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 18px; background: var(--accent); }
+  .bar s { position: absolute; top: -7px; bottom: -7px; width: 3px; background: var(--muted); }
+  .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+  .node { border-radius: 24px; padding: 26px; background: var(--surface); border: 1px solid var(--line); font-size: 28px; font-weight: 600; min-height: 150px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .node small { font-size: 21px; font-weight: 400; color: var(--muted); }
+  .node.hot { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  mark { background: var(--mark); color: var(--ink); border-radius: 6px; padding: 0 5px; }
+</style>
+</head>
+<body>
+
+<section class="slide" style="justify-content: center">
+  <p class="eyebrow">Night Shift · London · October 2026 · built on Mubit</p>
+  <h1>Brief Builder</h1>
+  <p class="lead" style="font-size: 46px; color: var(--ink); margin-top: 36px">Turn “can u do these?” into a booking.</p>
+  <p class="lead">A stylist’s DM inbox that drafts priced replies in her voice, and learns from every fix she makes.</p>
+  <div class="foot"><span>brief-builder.buy-ea2.workers.dev</span><span>github.com/machineyearningengineer/brief-builder</span></div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">The problem</p>
+  <h2>Every booking starts with a DM that says almost nothing.</h2>
+  <div class="row" style="grid-template-columns: 1fr 1fr">
+    <div style="display: grid; gap: 16px; align-content: center">
+      <span class="bubble">📷 can u do these? saturday</span>
+      <span class="bubble">how much for knotless</span>
+      <span class="bubble">sat??</span>
+      <span class="bubble">me and my sister want braids</span>
+      <span class="bubble">[voice note] hi um so I wanted to ask about…</span>
+    </div>
+    <ul class="points">
+      <li>Independent stylists run their business from Instagram DMs, mostly at night.</li>
+      <li>Before anything is booked she has to ask what they want, explain her price and rules, and offer a time.</li>
+      <li>Generic AI replies get her prices and rules wrong, and don’t sound like her.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">The product</p>
+  <h2>Vague message in. <span class="accent">Specific reply out.</span></h2>
+  <div class="row" style="grid-template-columns: 1.55fr 1fr">
+    <img class="shot" src="img/inbox-photo.webp" alt="">
+    <ul class="points">
+      <li>The photo is read into tags from <b>her</b> list: knotless, bum length, size.</li>
+      <li>A service sheet fills itself. Every field shows its source; anything without one is cleared.</li>
+      <li>The price comes from her price list, never from the model.</li>
+      <li>The reply is drafted in her voice, following her house rules.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">One tap</p>
+  <h2>She fixes it once. The price and the reply follow.</h2>
+  <div class="row" style="grid-template-columns: 1.55fr 1fr">
+    <img class="shot" src="img/fix.png" alt="">
+    <ul class="points">
+      <li>The reader said medium. She taps <b>smedium</b>: £200 becomes <b>£220</b> and the reply re-drafts.</li>
+      <li>Five seconds to undo. Fixes made together go as one.</li>
+      <li>Replies she hasn’t sent later in the thread re-draft too. If she already told the client £200, it offers a one-tap correction.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">It learns from her</p>
+  <h2>The next client gets it right first time. In her voice.</h2>
+  <div class="row" style="grid-template-columns: 1.55fr 1fr">
+    <img class="shot" src="img/voice-crop.png" alt="">
+    <ul class="points">
+      <li><b>Her fixes:</b> the closest past fixes guide each new draft.</li>
+      <li><b>Her photos:</b> a photo fix applies to photos that look like it, not to every photo.</li>
+      <li><b>Her voice:</b> drafts she rewrites teach how she writes. Prices and details are masked, so only the style carries over.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Closest yes</p>
+  <h2>Every no comes with the closest yes.</h2>
+  <div class="row" style="grid-template-columns: 1.55fr 1fr">
+    <img class="shot" src="img/inbox-closest-yes.webp" alt="">
+    <ul class="points">
+      <li>Small knotless to the waist, max £150: <b>large instead of small, £150</b>. Her length stays.</li>
+      <li>A wig install: a sew-in instead. Babylights over budget: highlights.</li>
+      <li>Worked out from her price list, changing what clients care about least first. One tap applies it as a fix.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Results · locked test DMs, never sent to Mubit for training</p>
+  <h2>Her fixes nearly double the replies it gets fully right.</h2>
+  <div style="margin-top: 56px">
+    <table>
+      <tr><th>Stylist</th><th>Test DMs</th><th style="width: 640px"></th><th>Plain model</th><th>With her fixes</th></tr>
+      <tr><td>Amara Braids, braider</td><td class="muted">60</td><td><div class="bar"><i style="width: 52%"></i><s style="left: 28%"></s></div></td><td class="n muted">28%</td><td class="n accent">52%</td></tr>
+      <tr><td>Lived-in Colour, colourist</td><td class="muted">20</td><td><div class="bar"><i style="width: 35%"></i><s style="left: 0%"></s></div></td><td class="n muted">0%</td><td class="n accent">35%</td></tr>
+      <tr><td>Gloss by Jade, nail tech</td><td class="muted">24</td><td><div class="bar"><i style="width: 58%"></i><s style="left: 29%"></s></div></td><td class="n muted">29%</td><td class="n accent">58%</td></tr>
+    </table>
+    <p class="muted" style="margin-top: 34px; font-size: 26px">Fully right means every field of the brief matches the label. Braider, offering times instead of booking: 26% → 67%. Right next step: 65% → 83%.</p>
+  </div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Use of Mubit</p>
+  <h2>Every fix she makes trains her own model.</h2>
+  <div style="margin-top: 60px; display: grid; gap: 26px">
+    <div class="flow">
+      <div class="node">Client DM<small>text and photos</small></div>
+      <div class="node">Brief Builder<small>photo reader, brief, guards</small></div>
+      <div class="node hot">Mubit<small>every call, recorded per task</small></div>
+      <div class="node">gpt-6-luna<small>the provider model</small></div>
+    </div>
+    <div class="flow">
+      <div class="node">Her fix<small>one tap on the sheet</small></div>
+      <div class="node">Re-drafted call<small>through Mubit, with her fix</small></div>
+      <div class="node">Kept example<small>her corrected answer</small></div>
+      <div class="node hot">Her adapter<small>v1 on Qwen3-4B, braider 50% and colourist 33% of target</small></div>
+    </div>
+  </div>
+  <ul class="points" style="margin-top: 40px; grid-template-columns: 1fr 1fr; display: grid; column-gap: 60px">
+    <li>The instructions depend only on her profile, so each stylist is one Mubit task.</li>
+    <li>Test runs and comparison drafts send <b>x-middleware-record: off</b>: never training data.</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Technical execution</p>
+  <h2>Built so a stylist can trust what it sends.</h2>
+  <div class="row" style="grid-template-columns: 1fr 1fr; align-items: start; margin-top: 56px">
+    <ul class="points">
+      <li><b>Nothing invented:</b> every field quotes the DM or a confident photo tag, or it’s cleared.</li>
+      <li><b>Her numbers:</b> prices and the closest yes come from her price list in code.</li>
+      <li><b>Conversations:</b> a settled field changes only when the new message says so.</li>
+    </ul>
+    <ul class="points">
+      <li><b>Private by design:</b> clients see only their own thread; keys never reach a browser.</li>
+      <li><b>Abuse limits:</b> per-client and per-room rate limits, image size checks, uploads checked by their actual file type.</li>
+      <li><b>Stack:</b> TanStack Start on Cloudflare Workers, one Durable Object per stylist, Effect Schema.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="slide">
+  <p class="eyebrow">Three stylists, one engine</p>
+  <h2>Her rules. Her prices. Her voice.</h2>
+  <div class="row" style="grid-template-columns: repeat(3, 1fr); align-items: start; margin-top: 50px">
+    <div class="card" style="display: grid; gap: 16px"><b style="font-size: 32px">Amara Braids</b><span class="muted">Peckham · knotless, box braids, locs</span><span class="bubble" style="font-size: 24px">can u do these? saturday</span><span class="bubble out" style="font-size: 24px">Hiya hun yes I can 💕 These would be £220, hair isn’t included. Amara x</span></div>
+    <div class="card" style="display: grid; gap: 16px"><b style="font-size: 32px">Lived-in Colour</b><span class="muted">Dalston · balayage and colour</span><span class="bubble" style="font-size: 24px">full colour 🙏 I’ve used box dye</span><span class="bubble out" style="font-size: 24px">As you’ve used box dye, I’d need to see your hair at a free 15-minute consultation first.</span></div>
+    <div class="card" style="display: grid; gap: 16px"><b style="font-size: 32px">Gloss by Jade</b><span class="muted">Hackney · BIAB, gel, acrylics</span><span class="bubble" style="font-size: 24px">long coffin acrylics with chrome on sat, got gel on from another salon</span><span class="bubble out" style="font-size: 24px">Long coffin acrylics with chrome and a soak-off would be £68.</span></div>
+  </div>
+  <p class="lead" style="font-size: 30px; margin-top: 40px">Next: her real calendar for live slots, Instagram’s messaging API, and serving her adapter once it passes.</p>
+  <div class="foot"><span>Try it: brief-builder.buy-ea2.workers.dev/s/braider</span><span>github.com/machineyearningengineer/brief-builder</span></div>
+</section>
+
+</body>
+</html>

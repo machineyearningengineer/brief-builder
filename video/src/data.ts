@@ -3,6 +3,7 @@
 // stage view reads, so the film can't claim more than the scoreboard does.
 import scoreboard from "../../src/shared/scoreboard.json"
 import mubit from "../../src/shared/mubit-status.json"
+import capture from "./capture.json"
 
 export const inboxNoise = [
   { name: "tolu.x", text: "can u do these? 😍", photo: true },
@@ -37,11 +38,18 @@ export const sideBySide = {
   fixed: "Hiya! Knotless to waist length with curly ends is £180, hair not included. I can offer Monday 9th at 10am or Wednesday 11th at 2pm, would either suit?",
 }
 
-export const stylists = [
+// The public cut swaps the nail card's screenshot of someone else's story for a text DM.
+export const publicNailCard = {
+  name: "Gloss by Jade", area: "Hackney", craft: "BIAB, gel, acrylics",
+  dm: "hiya can i get long coffin acrylics with chrome on sat, got gel on from another salon",
+  reply: "Hiya! Yes lovely, long coffin acrylics with chrome and a soak-off from another salon would be £68. I have Saturday at 10am or 1pm available, would either suit?",
+} as { name: string; area: string; craft: string; dm: string; reply: string; photo?: string }
+
+export const stylists: { name: string; area: string; craft: string; dm: string; reply: string; photo?: string }[] = [
   {
     name: "Amara Braids", area: "Peckham", craft: "Knotless, box braids, locs",
     dm: "can u do these? saturday", photo: "knotless.webp",
-    reply: hero.fixedReply,
+    reply: capture.hero.fixedReply,
   },
   {
     name: "Lived-in Colour", area: "Dalston", craft: "Balayage and colour",
