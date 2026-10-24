@@ -1,8 +1,8 @@
 // Who the demo stylists are, as clients see them. Prices and rules live in data/<id>/profile.json.
 export const STYLISTS = {
-  braider: { id: "braider", name: "Amara Braids", area: "Peckham", craft: "Knotless, box braids, locs, twists and silk presses" },
-  colourist: { id: "colourist", name: "Lived-in Colour", area: "Dalston", craft: "Balayage, highlights, full colour and toners" },
-  nails: { id: "nails", name: "Gloss by Jade", area: "Hackney", craft: "BIAB, gel, acrylics and nail art" },
+  braider: { id: "braider", owner: "Amara", name: "Amara Braids", area: "Peckham", craft: "Knotless, box braids, locs, twists and silk presses" },
+  colourist: { id: "colourist", owner: "Lou", name: "Lived-in Colour", area: "Dalston", craft: "Balayage, highlights, full colour and toners" },
+  nails: { id: "nails", owner: "Jade", name: "Gloss by Jade", area: "Hackney", craft: "BIAB, gel, acrylics and nail art" },
 } as const
 export type StylistKey = keyof typeof STYLISTS
 export const isStylist = (s: string): s is StylistKey => s in STYLISTS

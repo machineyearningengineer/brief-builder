@@ -1,4 +1,4 @@
-// The projector view: the locked-test scoreboard (from real runs) and the live room.
+// The projector view, read left to right at 1920×1080: the measured result, then the live room.
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import scoreboard from '../shared/scoreboard.json'
@@ -13,22 +13,35 @@ export const Route = createFileRoute('/stage')({
   component: Stage,
 })
 
-type Summary = { label: string; fullyRight: number; nextAction: number; fields: number; nextActionByRule: Record<string, number> }
+type Summary = { fullyRight: number; nextAction: number; fields: number; nextActionByRule: Record<string, number> }
 type Board = { testSet: string; base: Summary | null; corrected: Summary | null; rules?: Summary | null }
+type Adapter = { version: string; base: string; quality: number | null; target: number; state: string }
 const BOARDS = scoreboard as unknown as Record<string, Board | undefined>
+const ADAPTERS = mubit.adapters as unknown as Record<string, Adapter | undefined>
+
+// Each house rule as she'd say it.
 const RULE_SHORT: Record<StylistKey, Record<string, string>> = {
   braider: {
-    '1': 'Boho vs curly ends', '3': 'Hair not included', '4': 'Budget is a ceiling', '5': 'Offer slots, never book',
+    '1': 'Boho vs curly ends', '3': 'Hair not included', '4': 'Budget is a ceiling', '5': 'Offers times, never books',
     '6': 'Smedium', '7': 'Groups and kids', '9': 'Day words', '11': 'Photo vs text',
-  },
-  nails: {
-    '17': 'Soak-off from elsewhere', '18': 'Bitten nails: photo first', '19': 'Infection: refer', '20': 'Ballerina is coffin',
-    '21': 'Infills within 3 weeks', '22': 'Pinterest art: photo first', '5': 'Offer slots, never book', '9': 'Day words',
   },
   colourist: {
     '12': 'Patch test first', '13': 'Toner included', '14': 'Lived-in blonde', '15': 'Box dye needs a consult',
-    '16': 'Dark to blonde', '5': 'Offer slots, never book', '9': 'Day words', '4': 'Budget is a ceiling',
+    '16': 'Dark to blonde', '5': 'Offers times, never books', '9': 'Day words', '4': 'Budget is a ceiling',
   },
+  nails: {
+    '17': 'Soak-off from elsewhere', '18': 'Bitten nails: photo first', '19': 'Infection: refer', '20': 'Ballerina is coffin',
+    '21': 'Infills within 3 weeks', '22': 'Pinterest art: photo first', '5': 'Offers times, never books', '9': 'Day words',
+  },
+}
+
+const SPOKEN: Record<string, string> = {
+  butt: 'bum length', xl: 'extra long', cat_eye: 'cat eye', mid_back: 'mid-back', bra_strap: 'bra strap', box_braids: 'box braids', french_curls: 'French curls',
+  offer_slots: 'offer times', acrylic_full_set: 'acrylic set', gel_extensions: 'gel extensions', biab: 'BIAB', lived_in_blonde: 'lived-in blonde',
+}
+const say = (v: unknown) => {
+  const s = Array.isArray(v) ? v.join(', ') : String(v ?? '')
+  return SPOKEN[s] ?? s.replaceAll('_', ' ')
 }
 
 function Stage() {
@@ -41,127 +54,154 @@ function Stage() {
   }, [])
   const { messages, connected } = useRoom(stylist, token ? { token } : null)
   const latest = messages.at(-1)
-  const fixes = messages.filter((m) => m.corrected).length
   const lastFix = [...messages].reverse().find((m) => m.corrected && m.changed.length)
-  const adapter = (mubit.adapters as Record<string, { version: string; base: string; quality: number | null; target: number; tests: number | null; kept: number; state: string; next?: string | null; calls?: number }>)[stylist]
+  const fixes = messages.filter((m) => m.corrected).length
+  const name = STYLISTS[stylist].name
+  const first = STYLISTS[stylist].owner
   const board = BOARDS[stylist]
-  const base = board?.base
-  const fixed = board?.corrected
-  // The app as it runs: her fixes plus the decisions made in code.
-  const final = board?.rules ?? fixed
+  const url = `${origin.replace(/^https?:\/\//, '')}/s/${stylist}`
 
   return (
     <main className="stage">
-      <header>
-        <div>
-          <p className="eyebrow">Brief Builder · {board?.testSet ?? 'locked test set'}</p>
-          <h1>Every fix makes the next draft better, and trains her own model.</h1>
-        </div>
-        <div className="switch" role="group" aria-label="Stylist">
+      <nav className="top" aria-label="Stylist">
+        <b className="mark">Brief Builder</b>
+        <span className={connected ? 'dot on' : 'dot'} title={connected ? 'Live' : 'Connecting'} />
+        <div className="switch">
           {(Object.keys(STYLISTS) as StylistKey[]).map((s) => (
             <button key={s} className={s === stylist ? 'btn primary' : 'btn'} onClick={() => setStylist(s)}>{STYLISTS[s].name}</button>
           ))}
         </div>
-      </header>
+      </nav>
 
-      {base && fixed ? (
-        <section className="scores">
-          <Score label="Briefs fully right" a={base.fullyRight} b={fixed.fullyRight} c={board?.rules?.fullyRight} />
-          <Score label="Right next step" a={base.nextAction} b={fixed.nextAction} c={board?.rules?.nextAction} />
-          <Score label="Fields right" a={base.fields} b={fixed.fields} c={board?.rules?.fields} />
-        </section>
-      ) : (
-        <section className="scores"><p className="muted">This stylist’s locked test hasn’t been scored yet.</p></section>
-      )}
-
-      <section className="rules">
-        <h2>Right next step, by house rule</h2>
-        {base && final && <div className="legend"><span><i className="a" /> Plain model</span><span><i className="b" /> Brief Builder: her fixes and rules</span></div>}
-        {base && final && Object.entries(RULE_SHORT[stylist]).filter(([id]) => id in base.nextActionByRule).map(([id, name]) => {
-          const a = base.nextActionByRule[id] ?? 0
-          const b = final.nextActionByRule[id] ?? 0
-          return (
-            <div key={id} className="rule">
-              <span className="name">{name}</span>
-              <span className="bars">
-                <span className="bar a" style={{ width: `${a}%` }}><b>{a}%</b></span>
-                <span className="bar b" style={{ width: `${b}%` }}><b>{b}%</b></span>
-              </span>
-            </div>
-          )
-        })}
+      <section className="proof">
+        <h1>Every fix makes the next draft better.</h1>
+        {board?.base && board.corrected ? <Proof board={board} /> : <p className="muted">Not scored yet.</p>}
+        {board?.base && <RuleMoves stylist={stylist} board={board} />}
+        <Model adapter={ADAPTERS[stylist]} first={first} fixes={fixes} />
       </section>
 
-      <section className="live">
-        <div className="scan">
-          <Qr value={origin ? `${origin}/s/${stylist}` : ''} size={168} label={`QR code to message ${STYLISTS[stylist].name}`} />
-          <div>
-            <p className="eyebrow">Scan to message</p>
-            <p className="scan-name">{STYLISTS[stylist].name}</p>
-            <p className="muted mono">{origin.replace(/^https?:\/\//, '')}/s/{stylist}</p>
-          </div>
-        </div>
-        <h2>Live <span className={connected ? 'dot on' : 'dot'} aria-label={connected ? 'connected' : 'connecting'} /></h2>
-        {!token && <p className="muted">Open the inbox once on this laptop to connect the live view.</p>}
+      <section className="room" aria-live="polite">
+        {!token && <p className="muted">Open {first}’s inbox once on this laptop to connect.</p>}
         {latest ? (
-          <div className="latest rise" key={latest.id + latest.status}>
-            {latest.images.length > 0 && token && <StagePhoto stylist={stylist} id={latest.images[0]} token={token} />}
-            {latest.text && <p className="dm">“{latest.text}”</p>}
-            {latest.status === 'drafting' && <p className="muted"><span className="dots"><i /><i /><i /></span> Drafting through Mubit…</p>}
-            {latest.brief && (
-              <p className="facts">
-                {[latest.brief.service, latest.brief.look?.length, latest.brief.look?.size ?? latest.brief.look?.shade, latest.brief.look?.ends]
-                  .filter((v) => v && v !== 'unknown').map((v) => String(v).replaceAll('_', ' ')).join(' · ')}
-                <span> → {String(latest.brief.next_action).replace('_', ' ')}</span>
-              </p>
-            )}
-            {latest.brief && <p className="muted">{(latest.ms! / 1000).toFixed(1)} s · {latest.correctionsUsed} past fixes used</p>}
-            {latest.brief && latest.baseline && (
-              <div className="versus">
-                <div className="side plain">
-                  <p className="eyebrow">Plain model</p>
-                  <p>{latest.baseline.reply}</p>
-                  <small className="faint">Next step: {latest.baseline.nextAction.replace('_', ' ')}</small>
-                </div>
-                <div className="side ours">
-                  <p className="eyebrow">With {STYLISTS[stylist].name.split(' ')[0]}’s fixes</p>
-                  <p>{(latest.corrected ?? latest.brief).reply_draft}</p>
-                  <small>Next step: {String((latest.corrected ?? latest.brief).next_action).replace('_', ' ')}</small>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : token && <p className="muted">Scan the QR code and send a DM.</p>}
-        {lastFix && <FixLine m={lastFix} name={STYLISTS[stylist].name.split(' ')[0]} />}
-        {adapter && (
-          <div className="mubit">
-            <p className="eyebrow">{STYLISTS[stylist].name.split(' ')[0]}’s own model · in training on Mubit</p>
-            <p><b>{adapter.version}</b> on {adapter.base} · trained on {adapter.kept}+ kept examples</p>
-            <div className="meter" aria-label={adapter.quality == null ? 'Training' : `${adapter.quality}% of target`}><i style={{ width: `${adapter.quality ?? 0}%` }} /><span style={{ left: `${adapter.target}%` }} /></div>
-            <p className="muted">{adapter.quality == null ? `${adapter.state}, aiming for ${adapter.target}%` : `Matches the big model on ${adapter.quality}% of ${adapter.tests} test cases, aiming for ${adapter.target}%. ${adapter.state}`}. Checked {mubit.checkedAt}.</p>
-            {adapter.next && <p className="muted">{adapter.next}</p>}
+          <>
+            <Latest m={latest} stylist={stylist} token={token} first={first} />
+            {lastFix && <FixLine m={lastFix} first={first} />}
+            <VoiceLine messages={messages} first={first} />
+            <div className="scan small">
+              <Qr value={origin ? `${origin}/s/${stylist}` : ''} size={112} label={`QR code to message ${name}`} />
+              <span><b>Scan to DM {first}</b><span className="mono muted">{url}</span></span>
+            </div>
+          </>
+        ) : (
+          <div className="scan big">
+            <Qr value={origin ? `${origin}/s/${stylist}` : ''} size={360} label={`QR code to message ${name}`} />
+            <b>Scan to DM {name}</b>
+            <span className="mono muted">{url}</span>
           </div>
         )}
-        <VoiceLine messages={messages} name={STYLISTS[stylist].name.split(' ')[0]} />
-        <p className="count"><b>{fixes}</b> fixes this session · each one recorded by Mubit for the adapter</p>
       </section>
       <style>{STAGE_CSS}</style>
     </main>
   )
 }
 
-// How much of each draft she rewrote before sending, oldest to newest: falls as it learns her voice.
-function VoiceLine({ messages, name }: { messages: RoomMessage[]; name: string }) {
+// One big number, then how it got there.
+function Proof({ board }: { board: Board }) {
+  const base = board.base!
+  const fixes = board.corrected!
+  const final = board.rules ?? fixes
+  return (
+    <div className="numbers">
+      <p className="big"><span className="num">{final.fullyRight}%</span><span>of replies fully right, on {board.testSet.split(',')[0].replace(' locked DMs', '')} DMs it never trained on</span></p>
+      <div className="track" aria-hidden="true">
+        <i className="now" style={{ width: `${final.fullyRight}%` }} />
+        <i className="fixes" style={{ width: `${fixes.fullyRight}%` }} />
+        <i className="plain" style={{ width: `${base.fullyRight}%` }} />
+      </div>
+      <dl className="steps">
+        <div><dt>Plain model</dt><dd>{base.fullyRight}%</dd></div>
+        <div><dt>+ her fixes</dt><dd>{fixes.fullyRight}%</dd></div>
+        <div><dt>+ her rules in code</dt><dd className="accent">{final.fullyRight}%</dd></div>
+      </dl>
+      <dl className="pair">
+        <div><dd>{base.nextAction}% → <b>{final.nextAction}%</b></dd><dt>right next step</dt></div>
+        <div><dd>{base.fields}% → <b>{final.fields}%</b></dd><dt>fields right</dt></div>
+      </dl>
+    </div>
+  )
+}
+
+// The four house rules that moved most.
+function RuleMoves({ stylist, board }: { stylist: StylistKey; board: Board }) {
+  const base = board.base!
+  const final = board.rules ?? board.corrected!
+  const rows = Object.entries(RULE_SHORT[stylist])
+    .filter(([id]) => id in base.nextActionByRule && id in final.nextActionByRule)
+    .map(([id, label]) => ({ label, a: base.nextActionByRule[id], b: final.nextActionByRule[id] }))
+    .sort((x, y) => y.b - y.a - (x.b - x.a))
+    .slice(0, 4)
+  return (
+    <ul className="moves">
+      {rows.map((r) => (
+        <li key={r.label}>
+          <span className="label">{r.label}</span>
+          <span className="bar"><i style={{ width: `${r.b}%` }} /><s style={{ left: `${r.a}%` }} /></span>
+          <span className="vals"><span className="muted">{r.a}% →</span> <b>{r.b}%</b></span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Model({ adapter, first, fixes }: { adapter?: Adapter; first: string; fixes: number }) {
+  if (!adapter) return null
+  return (
+    <div className="model">
+      <span className="what"><b>{first}’s own model</b> {adapter.quality == null ? 'is training on Mubit' : `matches the big model ${adapter.quality}% of the time, aiming for ${adapter.target}%`}</span>
+      <span className="meter"><i style={{ width: `${adapter.quality ?? 0}%` }} /><s style={{ left: `${adapter.target}%` }} /></span>
+      <span className="muted">{fixes} {fixes === 1 ? 'fix' : 'fixes'} sent to Mubit this session</span>
+    </div>
+  )
+}
+
+function Latest({ m, stylist, token, first }: { m: RoomMessage; stylist: StylistKey; token: string; first: string }) {
+  const brief = m.corrected ?? m.brief
+  const facts = brief ? [brief.service, brief.look?.length, brief.look?.size ?? brief.look?.shade, brief.look?.shape, brief.look?.finish]
+    .filter((v) => v && v !== 'unknown').map(say) : []
+  return (
+    <div className="latest rise" key={m.id + m.status}>
+      <div className="dm">
+        {m.images.length > 0 && token && <StagePhoto stylist={stylist} id={m.images[0]} token={token} />}
+        <div>
+          {m.text && <p className="text">“{m.text}”</p>}
+          {m.status === 'drafting' && <p className="muted"><span className="dots"><i /><i /><i /></span> Drafting</p>}
+          {brief && (
+            <ul className="facts">
+              {facts.map((f) => <li key={f}>{f}</li>)}
+              <li className="next">{say(brief.next_action)}</li>
+            </ul>
+          )}
+        </div>
+      </div>
+      {brief && m.baseline && (
+        <div className="versus">
+          <div className="side plain"><b>Plain model</b><p>{m.baseline.reply}</p></div>
+          <div className="side ours"><b>{first}’s draft</b><p>{brief.reply_draft}</p></div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// How much of each draft she rewrote before sending, oldest to newest.
+function VoiceLine({ messages, first }: { messages: RoomMessage[]; first: string }) {
   const shares = messages.filter((m) => m.editShare != null).map((m) => m.editShare!)
   if (shares.length < 2) return null
-  const first = Math.round(shares[0] * 100)
-  const last = Math.round(shares.at(-1)! * 100)
   return (
-    <div className="voice">
-      <p className="eyebrow">How much {name} rewrites each draft</p>
-      <div className="bars">{shares.slice(-12).map((v, i) => <i key={i} style={{ height: `${Math.max(4, v * 100)}%` }} />)}</div>
-      <p className="muted">{first}% of the first draft · {last}% of the latest</p>
-    </div>
+    <p className="voice">
+      <span className="bars" aria-hidden="true">{shares.slice(-12).map((v, i) => <i key={i} style={{ height: `${Math.max(8, v * 100)}%` }} />)}</span>
+      {first} rewrote {Math.round(shares[0] * 100)}% of her first draft, {Math.round(shares.at(-1)! * 100)}% of her latest
+    </p>
   )
 }
 
@@ -180,86 +220,82 @@ function StagePhoto({ stylist, id, token }: { stylist: StylistKey; id: string; t
   return url ? <img className="stage-photo" src={url} alt="The client's photo" /> : null
 }
 
-const say = (v: unknown) => (Array.isArray(v) ? v.join(', ') || 'none' : v === 'unknown' || v == null ? 'not set' : String(v)).replaceAll('_', ' ')
-
-// The most recent correction, said the way the stylist made it.
-function FixLine({ m, name }: { m: RoomMessage; name: string }) {
+// The latest fix, the way she made it.
+function FixLine({ m, first }: { m: RoomMessage; first: string }) {
   const path = m.changed[0]
   const get = (o: any) => path.split('.').reduce((v, k) => v?.[k], o)
-  const label = path.split('.').pop()!.replace('_', ' ')
   const before = get(m.brief)
   const after = get(m.corrected)
-  const detail = Array.isArray(before) && Array.isArray(after)
-    ? `${before.filter((x) => !after.includes(x)).map(say).join(', ') || 'none'} → ${after.filter((x) => !before.includes(x)).map(say).join(', ') || 'removed'}`
-    : `${say(before)} → ${say(after)}`
+  const value = (v: unknown) => (v === 'unknown' || v == null || (Array.isArray(v) && !v.length) ? 'not set' : say(v))
   return (
     <p className="fixline settle" key={m.id + path}>
-      <b>{name} fixed {label}</b> {detail}{m.changed.length > 1 ? ` (+${m.changed.length - 1} more)` : ''}
+      <b>{first} fixed {say(path.split('.').pop())}:</b> {value(before)} → {value(after)}{m.changed.length > 1 ? `, and ${m.changed.length - 1} more` : ''}
     </p>
   )
 }
 
-// Plain model → with her fixes → with her rules in code (when scored).
-function Score({ label, a, b, c }: { label: string; a: number; b: number; c?: number }) {
-  return (
-    <div className="score">
-      <p className="eyebrow">{label}</p>
-      <p className="nums"><span className="from">{a}%</span><span className="arrow">→</span>{c == null ? <span className="to">{b}%</span> : <><span className="from">{b}%</span><span className="arrow">→</span><span className="to">{c}%</span></>}</p>
-      <p className="muted steps">{c == null ? 'plain · her fixes' : 'plain · her fixes · her rules in code'}</p>
-    </div>
-  )
-}
-
 const STAGE_CSS = `
-.stage { padding: 40px 56px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px 48px; min-height: 100dvh; align-content: start; }
-.stage header { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; }
-.stage h1 { font-size: clamp(30px, 3.4vw, 48px); font-weight: 750; max-width: 22ch; }
-.switch { display: flex; gap: 8px; }
-.scores { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.score { border: 1.5px dashed var(--line); border-radius: var(--radius); padding: 18px 22px; }
-.nums { margin: 6px 0 0; display: flex; align-items: baseline; gap: 14px; font-family: var(--display); font-variant-numeric: tabular-nums; }
-.from { font-size: 34px; color: var(--muted); }
-.arrow { font-size: 26px; color: var(--muted); }
-.to { font-size: 60px; font-weight: 750; color: var(--accent); }
-.score .steps { margin: 4px 0 0; font-size: 13px; }
-.rules h2, .live h2 { font-size: 22px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
-.legend { display: flex; gap: 18px; font-size: 14px; color: var(--muted); margin-bottom: 10px; }
-.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
-.legend i.a, .bar.a { background: var(--line); }
-.legend i.b, .bar.b { background: var(--accent); }
-.rule { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 14px; align-items: center; padding: 6px 0; }
-.rule .name { font-size: 16px; }
-.bars { display: grid; gap: 4px; }
-.bar { height: 16px; border-radius: 4px; position: relative; min-width: 2px; }
-.bar b { position: absolute; left: calc(100% + 6px); top: -2px; font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
-.bar.b b { color: var(--accent); }
-.live { border-left: 1px solid var(--line); padding-left: 32px; display: flex; flex-direction: column; gap: 10px; }
-.scan { display: flex; gap: 18px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin-bottom: 8px; }
-.scan svg { border-radius: 10px; flex: none; }
-.scan-name { font: 700 22px/1.2 var(--sans); margin: 4px 0; }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: inline-block; }
+.stage { height: 100dvh; padding: 28px 56px 40px; display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); grid-template-rows: auto minmax(0, 1fr); gap: 24px 64px; overflow: hidden; }
+.top { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
+.mark { font-family: var(--display); font-size: 20px; letter-spacing: -0.01em; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
 .dot.on { background: var(--good); }
-.latest { border: 1.5px dashed var(--accent); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 6px; }
-.latest .dm { font-size: 22px; margin: 0; }
-.facts { margin: 0; font-weight: 600; font-size: 18px; }
-.facts span { color: var(--accent); }
-.stage-photo { width: 120px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; float: right; margin-left: 12px; }
-.fixline { border-left: 3px solid var(--good); border-radius: 0; padding: 6px 12px; background: var(--good-soft); font-size: 16px; }
-.fixline b { color: var(--good); margin-right: 6px; }
-.voice { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 8px; background: var(--surface); }
-.voice .bars { display: flex; align-items: flex-end; gap: 6px; height: 56px; }
-.voice .bars i { flex: 1; border-radius: 4px; background: var(--accent); transition: height 400ms var(--ease); }
-.mubit { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 6px; background: var(--surface); }
-.mubit p { margin: 0; }
-.meter { position: relative; height: 10px; border-radius: 5px; background: var(--sunken); overflow: visible; }
-.meter i { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
-.meter span { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--ink); }
-.versus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 6px; }
-.side { border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; font-size: 15px; line-height: 1.45; }
+.switch { margin-left: auto; display: flex; gap: 8px; }
+.proof { display: flex; flex-direction: column; gap: 28px; min-height: 0; }
+.proof h1 { font-family: var(--display); font-size: clamp(36px, 3.4vw, 60px); font-weight: 750; letter-spacing: -0.03em; line-height: 1; max-width: 16ch; }
+.numbers { display: grid; gap: 14px; }
+.big { margin: 0; display: flex; align-items: baseline; gap: 18px; font-size: 20px; color: var(--muted); }
+.big .num { font-family: var(--display); font-weight: 750; font-size: clamp(96px, 9vw, 168px); line-height: 0.85; letter-spacing: -0.04em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.big span:last-child { max-width: 22ch; text-wrap: balance; }
+.track { position: relative; height: 14px; border-radius: 14px; background: var(--sunken); overflow: hidden; }
+.track i { position: absolute; inset: 0 auto 0 0; border-radius: 14px; }
+.track .now { background: var(--accent); }
+.track .fixes { background: color-mix(in oklch, var(--accent) 45%, var(--sunken)); }
+.track .plain { background: var(--faint); }
+dl { margin: 0; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.steps dt { font-size: 15px; color: var(--muted); }
+.steps dd { margin: 2px 0 0; font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.steps dd.accent, .pair b, .moves b { color: var(--accent); }
+.pair { display: flex; gap: 40px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.pair div { display: flex; align-items: baseline; gap: 10px; }
+.pair dd { margin: 0; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pair dt { color: var(--muted); }
+.moves { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.moves li { display: grid; grid-template-columns: 230px minmax(0, 1fr) 120px; gap: 14px; align-items: center; font-size: 17px; }
+.moves .bar { position: relative; height: 10px; border-radius: 10px; background: var(--sunken); }
+.moves .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 10px; background: var(--accent); }
+.moves .bar s { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--muted); }
+.moves .vals { text-align: right; font-variant-numeric: tabular-nums; }
+.model { margin-top: auto; display: grid; gap: 8px; font-size: 16px; }
+.model .meter { position: relative; height: 8px; border-radius: 8px; background: var(--sunken); }
+.model .meter i { position: absolute; inset: 0 auto 0 0; border-radius: 8px; background: var(--accent); }
+.model .meter s { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+.room { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.latest { display: grid; gap: 16px; padding: 22px; border-radius: 24px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.latest .dm { display: flex; gap: 18px; align-items: flex-start; }
+.stage-photo { width: 132px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 14px; flex: none; }
+.latest .text { margin: 0 0 12px; font-size: 30px; line-height: 1.25; font-weight: 600; }
+.facts { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.facts li { padding: 6px 12px; border-radius: 99px; background: var(--sunken); font-size: 16px; font-weight: 600; }
+.facts .next { background: var(--accent); color: var(--on-accent); }
+.versus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.side { border-radius: 16px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.side b { font-size: 14px; }
+.side p { margin: 0; font-size: 19px; line-height: 1.45; }
 .side.plain { background: var(--sunken); color: var(--muted); }
-.side.ours { background: var(--accent-soft); border: 1.5px solid var(--accent); }
-.side.ours small { color: var(--accent); font-weight: 600; }
-.count { margin-top: auto; color: var(--muted); }
-.count b { font: 750 32px var(--display); color: var(--ink); margin-right: 6px; }
-@media (max-width: 900px) { .stage { grid-template-columns: minmax(0, 1fr); padding: 20px 16px; } .scores { grid-template-columns: minmax(0, 1fr); } .live { border-left: 0; padding-left: 0; } .stage header { flex-direction: column; align-items: flex-start; } .rule { grid-template-columns: 130px minmax(0, 1fr); } }
+.side.ours { background: var(--accent-soft); outline: 1.5px solid var(--accent); }
+.side.ours b { color: var(--accent); }
+.fixline { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--good-soft); font-size: 18px; }
+.fixline b { color: var(--good); }
+.voice { margin: 0; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 16px; }
+.voice .bars { display: flex; align-items: flex-end; gap: 4px; height: 32px; width: 120px; }
+.voice .bars i { flex: 1; border-radius: 3px; background: var(--accent); }
+.scan { display: flex; align-items: center; gap: 16px; }
+.scan svg { border-radius: 12px; flex: none; }
+.scan.small { margin-top: auto; align-self: flex-end; }
+.scan.small > span { display: grid; gap: 2px; text-align: right; order: -1; }
+.scan.big { flex: 1; flex-direction: column; justify-content: center; gap: 14px; font-size: 30px; }
+.scan.big .mono { font-size: 18px; }
+@media (max-width: 1100px) { .stage { height: auto; overflow: visible; grid-template-columns: minmax(0, 1fr); padding: 20px 16px; } .moves li { grid-template-columns: 150px minmax(0, 1fr) 90px; } }
 `

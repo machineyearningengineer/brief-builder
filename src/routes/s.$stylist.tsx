@@ -233,7 +233,7 @@ function ChatPage() {
               <h3 className="eyebrow">Good to know</h3>
               <ul className="policies">{POLICIES[stylist].map((p) => <li key={p}>{p}</li>)}</ul>
             </div>
-            <button className="btn primary full" onClick={() => { setSheet(false); box.current?.focus() }}>Message {info.name.split(' ')[0]}</button>
+            <button className="btn primary full" onClick={() => { setSheet(false); box.current?.focus() }}>Message {info.owner}</button>
           </section>
         </div>
       )}
