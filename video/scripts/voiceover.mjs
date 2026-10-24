@@ -98,6 +98,6 @@ console.log(`track: public/vo/${name}/track.wav`)
 // The story cut reuses the same clips, fewer of them, at its own times (voiceover-vertical.json).
 const story = JSON.parse(readFileSync(new URL("../voiceover-vertical.json", import.meta.url), "utf8"))
 const storyFilters = story.map((s, i) => `[${i}:a]aresample=44100,${s.until ? `atrim=end=${s.until},` : ""}afade=t=in:d=0.02,areverse,afade=t=in:d=0.06,areverse,adelay=${Math.round(s.at * 1000)}:all=1[a${i}]`)
-const storyMix = `${story.map((_, i) => `[a${i}]`).join("")}amix=inputs=${story.length}:normalize=0:duration=longest,apad=whole_dur=59[out]`
+const storyMix = `${story.map((_, i) => `[a${i}]`).join("")}amix=inputs=${story.length}:normalize=0:duration=longest,apad=whole_dur=60[out]`
 execFileSync("ffmpeg", ["-y", "-v", "error", ...story.flatMap((s) => ["-i", clips[s.line]]), "-filter_complex", [...storyFilters, storyMix].join(";"), "-map", "[out]", "-ac", "1", new URL("story.wav", dir).pathname])
 console.log(`story: public/vo/${name}/story.wav`)

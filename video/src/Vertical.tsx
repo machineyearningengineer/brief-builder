@@ -7,25 +7,25 @@ import { Close } from "./Launch.tsx"
 import { inboxNoise, scores } from "./data.ts"
 import { Avatar, Count, Eyebrow, Phone, Rise, Scene, t } from "./ui.tsx"
 
-export const STORY = { noise: 210, title: 120, canvas: 900, results: 330, close: 210 }
+export const STORY = { noise: 210, title: 120, canvas: 960, results: 315, close: 195 }
 export const STORY_FRAMES = Object.values(STORY).reduce((a, b) => a + b, 0)
 
 export function Vertical({ voice }: { voice?: string }) {
   return (
     <AbsoluteFill style={{ background: t.bg, color: t.ink, fontFamily: t.sans }}>
       <Series>
-        <Series.Sequence durationInFrames={STORY.noise}><Noise /></Series.Sequence>
-        <Series.Sequence durationInFrames={STORY.title}><Title /></Series.Sequence>
+        <Series.Sequence durationInFrames={STORY.noise}><StoryNoise /></Series.Sequence>
+        <Series.Sequence durationInFrames={STORY.title}><StoryTitle /></Series.Sequence>
         <Series.Sequence durationInFrames={STORY.canvas}><InboxCanvas vertical /></Series.Sequence>
         <Series.Sequence durationInFrames={STORY.results}><Results /></Series.Sequence>
-        <Series.Sequence durationInFrames={STORY.close}><Close /></Series.Sequence>
+        <Series.Sequence durationInFrames={STORY.close}><Close frames={STORY.close} /></Series.Sequence>
       </Series>
       {voice && <Html5Audio src={staticFile(`vo/${voice}/story.wav`)} />}
     </AbsoluteFill>
   )
 }
 
-function Noise() {
+export function StoryNoise() {
   return (
     <Scene frames={STORY.noise}>
       <div style={{ position: "absolute", left: 72, right: 72, top: 150 }}>
@@ -53,7 +53,7 @@ function Noise() {
   )
 }
 
-function Title() {
+export function StoryTitle() {
   return (
     <Scene frames={STORY.title}>
       <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", textAlign: "center", padding: 72 }}>

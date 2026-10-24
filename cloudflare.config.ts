@@ -14,6 +14,8 @@ export default defineConfig({
 			ROOMS: bindings.durableObject({ worker: "brief-builder", exportName: "StylistRoom" }),
 			MUBIT_API_KEY: bindings.secret(),
 			STYLIST_TOKEN: bindings.secret(),
+			// The site's own built files, so the worker can serve the films with byte ranges.
+			ASSETS: bindings.assets(),
 		},
 		exports: {
 			StylistRoom: exports.durableObject({ storage: "sqlite" }),

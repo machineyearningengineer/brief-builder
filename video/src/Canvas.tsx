@@ -25,6 +25,7 @@ const CAM_V: [number, number, number, number][] = [
   [270, 1518, 300, 1.55], [340, 1518, 300, 1.55], [385, 880, 320, 1.6], [450, 880, 330, 1.6],
   [500, 1518, 300, 1.45], [560, 1518, 300, 1.45], [610, 1153, 420, 0.87], [700, 1153, 420, 0.87],
   [760, 1153, 900, 0.6], [800, 1153, 900, 0.6], [850, 1153, 1380, 0.87], [940, 1153, 1380, 0.87],
+  [990, 2100, 1400, 1.5], [1100, 2100, 1400, 1.5], [1150, 1518, 1380, 1.45], [1290, 1518, 1380, 1.45],
 ]
 const ease = Easing.bezier(0.65, 0, 0.35, 1)
 function camera(f: number, keys = CAM) {
@@ -146,14 +147,14 @@ function HeroSheet() {
   )
 }
 
-function ReplyCard({ x, y, label, first, second, typeAt, redraftFrom, redraftTo, mark }: { x: number; y: number; label: string; first: string; second?: string; typeAt: number; redraftFrom?: number; redraftTo?: number; mark?: number }) {
+function ReplyCard({ x, y, label, first, second, typeAt, redraftFrom, redraftTo, mark, width = 460 }: { x: number; y: number; label: string; first: string; second?: string; typeAt: number; redraftFrom?: number; redraftTo?: number; mark?: number; width?: number }) {
   const f = useCurrentFrame()
   const busy = redraftFrom != null && f >= redraftFrom && f < redraftTo!
   const showSecond = second && redraftTo != null && f >= redraftTo
   const text = showSecond ? second! : first
   const at = showSecond ? redraftTo! : typeAt
   return (
-    <Card style={{ position: "absolute", left: x, top: y, width: 460, padding: "28px 30px", minHeight: 360, opacity: interpolate(f, [typeAt - 16, typeAt - 2], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}>
+    <Card style={{ position: "absolute", left: x, top: y, width, padding: "28px 30px", minHeight: 360, opacity: interpolate(f, [typeAt - 16, typeAt - 2], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}>
       <Eyebrow style={busy ? { color: t.accent } : undefined}>{busy ? "Re-drafting with her fix" : label}</Eyebrow>
       <div style={{ marginTop: 16, fontSize: 24, lineHeight: 1.45, opacity: busy ? 0.3 : 1 }}>
         {f >= at ? (mark && f >= mark ? <Voiced text={text} /> : <Typed text={text} at={at} />) : null}
@@ -244,7 +245,7 @@ function VoiceCard() {
 }
 
 // Over budget: the sheet offers the closest yes from her price list; one tap and the reply follows.
-export function ClosestYesScene() {
+export function ClosestYesScene({ vertical = false }: { vertical?: boolean }) {
   const f = useCurrentFrame()
   const tap = 150
   const fixed = f >= tap
@@ -253,11 +254,11 @@ export function ClosestYesScene() {
   const card = useRise(70)
   return (
     <div style={{ position: "absolute", inset: 0, background: t.bg, color: t.ink, fontFamily: t.sans, opacity: o }}>
-      <Rise at={0} style={{ position: "absolute", left: 120, top: 80 }}><Eyebrow>Over budget</Eyebrow></Rise>
-      <Rise at={6} style={{ position: "absolute", left: 120, top: 130, width: 520 }}>
+      <Rise at={0} style={{ position: "absolute", left: vertical ? 72 : 120, top: vertical ? 130 : 80 }}><Eyebrow>Over budget</Eyebrow></Rise>
+      <Rise at={6} style={{ position: "absolute", left: vertical ? 72 : 120, top: vertical ? 180 : 130, width: vertical ? 936 : 520 }}>
         <div style={{ padding: "18px 22px", borderRadius: 26, background: t.sunken, fontSize: 30, lineHeight: 1.35 }}>{capture.budget.dm}</div>
       </Rise>
-      <Card style={{ position: "absolute", left: 700, top: 120, width: 560, padding: "28px 34px" }}>
+      <Card style={{ position: "absolute", left: vertical ? 72 : 700, top: vertical ? 400 : 120, width: vertical ? 936 : 560, padding: "28px 34px" }}>
         <Eyebrow>Service sheet</Eyebrow>
         {[["Service", "Knotless"], ["Length", "Waist length"], ["Size", fixed ? "Large" : "Small"]].map(([k, v]) => (
           <div key={k} style={{ display: "grid", gridTemplateColumns: "150px 1fr", padding: "16px 0", borderBottom: `1px dashed ${t.line}`, fontSize: 24 }}>
@@ -277,12 +278,12 @@ export function ClosestYesScene() {
           <span style={{ padding: "14px 24px", borderRadius: 99, background: t.accent, color: t.onAccent, fontWeight: 600, fontSize: 21, transform: `scale(${press})`, whiteSpace: "nowrap" }}>Use this</span>
         </div>
       </Card>
-      <div style={{ position: "absolute", left: 1320, top: 120 }}>
-        <ReplyCard x={0} y={0} label="Draft reply" first={capture.budget.reply} second={capture.budget.fixedReply} typeAt={24} redraftFrom={tap + 6} redraftTo={tap + 60} />
+      <div style={{ position: "absolute", left: vertical ? 72 : 1320, top: vertical ? 1010 : 120 }}>
+        <ReplyCard width={vertical ? 936 : 460} x={0} y={0} label="Draft reply" first={capture.budget.reply} second={capture.budget.fixedReply} typeAt={24} redraftFrom={tap + 6} redraftTo={tap + 60} />
       </div>
-      <div style={{ position: "absolute", left: 120, top: 820, width: 1600 }}>
+      <div style={{ position: "absolute", left: vertical ? 72 : 120, top: vertical ? 1440 : 820, width: vertical ? 936 : 1600 }}>
         <Rise at={210}>
-          <h2 style={{ margin: 0, fontFamily: t.display, fontWeight: 700, fontSize: 76, letterSpacing: "-0.025em" }}>Every no comes with the closest yes.</h2>
+          <h2 style={{ margin: 0, fontFamily: t.display, fontWeight: 700, fontSize: vertical ? 72 : 76, lineHeight: 1.04, letterSpacing: "-0.025em", textWrap: "balance" }}>Every no comes with the closest yes.</h2>
           <p style={{ margin: "18px 0 0", fontSize: 30, color: t.muted }}>Worked out from her price list. One tap, and the reply follows.</p>
         </Rise>
       </div>

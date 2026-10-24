@@ -5,6 +5,7 @@ interface __BaseEnv_Env {
 	MUBIT_API_KEY: string;
 	STYLIST_TOKEN: string;
 	ROOMS: DurableObjectNamespace<import("./src/server").StylistRoom>;
+	ASSETS: Fetcher;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

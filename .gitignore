@@ -26,3 +26,6 @@ runs/
 demo/client-photos/
 video/public/story-*
 video/out/
+
+# The films, served by the site; built in video/ and copied here before a deploy
+public/film/*.mp4

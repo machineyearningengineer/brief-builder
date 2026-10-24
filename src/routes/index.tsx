@@ -1,5 +1,6 @@
 // The front page: what it does, the measured result, and the three stylists to message.
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { ChatIcon, InboxIcon, PinIcon } from '../client/icons.tsx'
 import { Tip } from '../client/tip.tsx'
 import scoreboard from '../shared/scoreboard.json'
@@ -41,6 +42,8 @@ function Home() {
           <Steps {...hero} />
         </section>
       )}
+
+      <Film />
 
       <ol className="how" aria-label="How it works">
         <li><b>A client DMs</b><span>A photo and a few words.</span></li>
@@ -89,6 +92,41 @@ function Home() {
       </footer>
       <style>{CSS}</style>
     </main>
+  )
+}
+
+// The film, sized to the screen: upright on a phone, landscape on a wider screen. The short cut
+// is the 60-second version, for anyone in a hurry.
+const CUTS = {
+  film: { label: 'Full film', length: '1:59', wide: { src: '/media/brief-builder.mp4', poster: '/film/poster.jpg' }, tall: { src: '/media/brief-builder-mobile.mp4', poster: '/film/mobile-poster.jpg' } },
+  short: { label: 'Short', length: '0:59', wide: { src: '/media/brief-builder-story.mp4', poster: '/film/story-poster.jpg' }, tall: { src: '/media/brief-builder-story.mp4', poster: '/film/story-poster.jpg' } },
+} as const
+type Cut = keyof typeof CUTS
+
+function Film() {
+  const [cut, setCut] = useState<Cut>('film')
+  const [tall, setTall] = useState(false)
+  useEffect(() => {
+    const q = window.matchMedia('(max-aspect-ratio: 4/5)')
+    setTall(q.matches)
+    const on = () => setTall(q.matches)
+    q.addEventListener('change', on)
+    return () => q.removeEventListener('change', on)
+  }, [])
+  const upright = tall || cut === 'short'
+  const v = CUTS[cut][tall ? 'tall' : 'wide']
+  return (
+    <section className={`film ${upright ? 'upright' : ''}`} aria-labelledby="film-title">
+      <div className="film-head">
+        <h2 id="film-title">Watch it work</h2>
+        <div className="cuts" role="group" aria-label="Which cut">
+          {(Object.keys(CUTS) as Cut[]).map((k) => (
+            <button key={k} type="button" aria-pressed={cut === k} onClick={() => setCut(k)}>{CUTS[k].label} <span>{CUTS[k].length}</span></button>
+          ))}
+        </div>
+      </div>
+      <video key={v.src} src={v.src} poster={v.poster} controls playsInline preload="metadata" />
+    </section>
   )
 }
 
@@ -159,6 +197,16 @@ const CSS = `
 .actions .quiet { color: var(--muted); border: 1px solid var(--line); }
 .actions .quiet:hover { color: var(--ink); }
 .actions a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.film { display: grid; gap: 14px; }
+.film-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.film h2 { font-family: var(--display); font-size: 28px; letter-spacing: -0.02em; }
+.cuts { display: inline-flex; padding: 3px; border-radius: 99px; background: var(--sunken); }
+.cuts button { border: 0; background: none; padding: 7px 14px; border-radius: 99px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.cuts button span { font-weight: 500; font-variant-numeric: tabular-nums; opacity: 0.8; }
+.cuts button[aria-pressed=true] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.cuts button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.film video { display: block; width: 100%; border-radius: 22px; background: #0b090a; border: 1px solid var(--line); box-shadow: var(--shadow); aspect-ratio: 16 / 9; }
+.film.upright video { aspect-ratio: 9 / 16; width: min(100%, 380px, calc(78svh * 9 / 16)); justify-self: center; }
 .foot { display: flex; gap: 18px; font-size: 14px; }
 .foot a { color: var(--muted); }
 @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } .how { grid-template-columns: 1fr; gap: 0; } .how li { border: 0; border-bottom: 1px dashed var(--line); border-radius: 0; padding: 12px 0; grid-template-columns: 30px 1fr; column-gap: 10px; } .how li::before { grid-row: span 2; margin: 0; } .home { padding-block: 32px 48px; gap: 28px; } }

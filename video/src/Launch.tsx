@@ -258,10 +258,10 @@ export function RealApp() {
 }
 
 // 9. Close.
-export function Close() {
+export function Close({ frames = SCENES.close }: { frames?: number }) {
   // Signs off in three beats, in time with the narration: the DM, the outcome, the name.
   return (
-    <Scene frames={SCENES.close}>
+    <Scene frames={frames}>
       <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", textAlign: "center" }}>
         <div>
           <Rise at={18}><div style={{ fontSize: 56, color: t.muted, fontStyle: "italic" }}>“can u do these?”</div></Rise>

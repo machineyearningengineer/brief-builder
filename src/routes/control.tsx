@@ -14,6 +14,7 @@ export const Route = createFileRoute('/control')({
 const RELEASE = 'https://github.com/machineyearningengineer/brief-builder/releases/download/v1.0'
 const FILES = [
   { label: 'The film', note: 'Submission cut, under 2 minutes', href: `${RELEASE}/brief-builder-launch.mp4` },
+  { label: 'Upright film', note: 'The full film for phones, 1:59', href: `${RELEASE}/brief-builder-mobile.mp4` },
   { label: 'Story cut', note: 'Upright, under a minute, for social', href: `${RELEASE}/brief-builder-story.mp4` },
   { label: 'Live footage', note: 'The real stage, 25 seconds', href: `${RELEASE}/brief-builder-live-footage.mp4` },
   { label: 'Deck', note: 'PDF, 10 slides', href: `${RELEASE}/brief-builder-deck.pdf` },
