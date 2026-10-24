@@ -98,7 +98,7 @@ function Steps({ plain, fixes, now }: { plain: number; fixes: number; now: numbe
     <div className="steps">
       <div className="track"><i className="now" style={{ width: `${now}%` }} /><i className="fixes" style={{ width: `${fixes}%` }} /><i className="plain" style={{ width: `${plain}%` }} /></div>
       <dl>
-        <div><dt><Tip tip="gpt-6-luna on its own, with her prices and house rules in its instructions.">Plain model</Tip></dt><dd>{plain}%</dd></div>
+        <div><dt><Tip tip="The base model on its own, with her prices and house rules in its instructions.">Plain model</Tip></dt><dd>{plain}%</dd></div>
         <div><dt><Tip tip="Her closest past fixes go into each draft as worked examples.">Her fixes</Tip></dt><dd>{fixes}%</dd></div>
         <div><dt><Tip tip="Code decides the next step, what’s missing, dates and time windows, following her rules exactly." align="end">Her rules in code</Tip></dt><dd className="accent">{now}%</dd></div>
       </dl>

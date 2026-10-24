@@ -496,7 +496,7 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
               {field({ path: 'next_action', label: 'Next step', options: NEXT })}
             </div>
 
-            <p className="drafted faint">Drafted by gpt-6-luna through Mubit{m.ms ? ` in ${(m.ms / 1000).toFixed(1)} s` : ''}, using {m.correctionsUsed} of your past fixes.{m.requestId && <> <span className="mono">{m.requestId}</span></>}</p>
+            <p className="drafted faint">Drafted through Mubit{m.ms ? ` in ${(m.ms / 1000).toFixed(1)} s` : ''}, using {m.correctionsUsed} of your past fixes.{m.requestId && <> <span className="mono">{m.requestId}</span></>}</p>
 
             {(pending || note) && (
               <div className="toast settle" role="status">

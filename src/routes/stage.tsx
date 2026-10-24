@@ -35,7 +35,7 @@ const EXPLAIN = {
   fully: 'Every detail of the brief matches what she would have written: service, look, day, price details and what to do next.',
   next: 'It chose what she would do next: ask a question, quote a price, offer times, decline or refer.',
   details: 'Single details that match, counted one by one across every brief.',
-  plain: 'gpt-6-luna on its own, with her prices and house rules in its instructions.',
+  plain: 'The base model on its own, with her prices and house rules in its instructions.',
   fixes: 'Her closest past fixes go into each draft as worked examples.',
   rules: 'Code decides the next step, what’s missing, dates and time windows, following her rules exactly.',
 }

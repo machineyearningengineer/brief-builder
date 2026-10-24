@@ -170,7 +170,7 @@ function Bar({ at, label, a, m, z }: { at: number; label: string; a: number; m: 
 // 7. Where Mubit sits, and what her fixes become.
 function Mubit() {
   const braider = adapters.braider
-  const top = ["Client DM", "Brief Builder", "Mubit", "gpt-6-luna"]
+  const top = ["Client DM", "Brief Builder", "Mubit", "Any model"]
   const bottom = ["Her fix", "Kept example", "Her own model"]
   return (
     <Scene frames={SCENES.mubit}>
