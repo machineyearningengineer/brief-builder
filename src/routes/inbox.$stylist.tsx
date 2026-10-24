@@ -92,20 +92,25 @@ function InboxPage() {
     setToken(stylistToken.get())
   }, [])
   const { messages, connected, denied } = useRoom(stylist, token ? { token } : null)
+  // One conversation per client, newest activity first.
   const [selected, setSelected] = useState<string | null>(null)
-  const list = useMemo(() => [...messages].reverse(), [messages])
-  const current = messages.find((m) => m.id === selected) ?? list[0] ?? null
+  const list = useMemo(() => {
+    const byClient = new Map<string, RoomMessage[]>()
+    for (const m of messages) byClient.set(m.clientId, [...(byClient.get(m.clientId) ?? []), m])
+    return [...byClient.values()].sort((a, b) => b.at(-1)!.createdAt - a.at(-1)!.createdAt)
+  }, [messages])
+  const current = list.find((t) => t[0].clientId === selected) ?? list[0] ?? null
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('textarea, input, select')) return
-      const i = list.findIndex((m) => m.id === current?.id)
-      if (e.key === 'j' && i < list.length - 1) setSelected(list[i + 1].id)
-      if (e.key === 'k' && i > 0) setSelected(list[i - 1].id)
+      const i = list.findIndex((t) => t[0].clientId === current?.[0].clientId)
+      if (e.key === 'j' && i < list.length - 1) setSelected(list[i + 1][0].clientId)
+      if (e.key === 'k' && i > 0) setSelected(list[i - 1][0].clientId)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [list, current?.id])
+  }, [list, current?.[0].clientId])
 
   if (!token || denied) {
     return (
@@ -135,18 +140,21 @@ function InboxPage() {
           </span>
         </header>
         {list.length === 0 && <p className="muted empty">New DMs show up here the moment they’re sent.</p>}
-        {list.map((m) => (
-          <button key={m.id} className={m.id === current?.id ? 'row on' : 'row'} onClick={() => setSelected(m.id)}>
-            <span className="avatar" aria-hidden="true">{shortId(m.clientId).slice(0, 1)}</span>
-            <span className="row-text">
-              <span className="row-top"><b>Client {shortId(m.clientId)}</b><small>{time(m.createdAt)}</small></span>
-              <span className="snippet">{m.text || 'Sent a photo'}</span>
-              <small className={`state ${m.status}`}>{m.status === 'drafting' ? 'Drafting…' : m.status === 'replied' ? 'Replied' : m.corrected ? 'You corrected this' : m.status === 'failed' ? 'Reply by hand' : 'Draft ready'}</small>
-            </span>
-          </button>
-        ))}
+        {list.map((t) => {
+          const m = t.at(-1)!
+          return (
+            <button key={m.clientId} className={m.clientId === current?.[0].clientId ? 'row on' : 'row'} onClick={() => setSelected(m.clientId)}>
+              <span className="avatar" aria-hidden="true">{shortId(m.clientId).slice(0, 1)}</span>
+              <span className="row-text">
+                <span className="row-top"><b>Client {shortId(m.clientId)}</b><small>{time(m.createdAt)}</small></span>
+                <span className="snippet">{m.text || 'Sent a photo'}</span>
+                <small className={`state ${m.status}`}>{m.status === 'drafting' ? 'Drafting…' : m.status === 'replied' ? 'Replied' : m.corrected ? 'You corrected this' : m.status === 'failed' ? 'Reply by hand' : 'Draft ready'}{t.length > 1 ? ` · ${t.length} messages` : ''}</small>
+              </span>
+            </button>
+          )
+        })}
       </aside>
-      {current ? <Detail key={current.id} m={current} stylist={stylist} token={token} onBack={() => setSelected(null)} /> : <div className="detail empty-pane"><p className="muted">No messages yet.</p></div>}
+      {current ? <Detail key={current.at(-1)!.id} thread={current} stylist={stylist} token={token} onBack={() => setSelected(null)} /> : <div className="detail empty-pane"><p className="muted">No messages yet.</p></div>}
       <style>{CSS}</style>
     </div>
   )
@@ -202,7 +210,10 @@ const setPath = (o: any, path: string, value: unknown) => {
 }
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 
-function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: StylistKey; token: string; onBack: () => void }) {
+// A client's whole conversation; the sheet and the reply belong to its newest message, whose
+// brief is the running brief for the conversation.
+function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; stylist: StylistKey; token: string; onBack: () => void }) {
+  const m = thread.at(-1)!
   const saved = m.corrected ?? m.brief
   const [pending, setPending] = useState<Pending | null>(null)
   const [left, setLeft] = useState(0)
@@ -346,10 +357,14 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
           <div><b>Client {shortId(m.clientId)}</b><small className="muted">{time(m.createdAt)}</small></div>
         </header>
         <div className="convo">
-          <Photos ids={m.images} stylist={stylist} token={token} />
-          {m.text && <p className="bubble in">{highlight(m.text, Object.values(brief?.evidence ?? {}) as string[])}</p>}
-          {m.status === 'drafting' && <p className="muted typing"><span className="dots"><i /><i /><i /></span> Reading the message{m.images.length ? ' and photo' : ''}</p>}
-          {m.reply && <p className="bubble out rise">{m.reply}</p>}
+          {thread.map((t) => (
+            <div key={t.id} className="turn">
+              <Photos ids={t.images} stylist={stylist} token={token} />
+              {t.text && <p className="bubble in">{highlight(t.text, Object.values(brief?.evidence ?? {}) as string[])}</p>}
+              {t.status === 'drafting' && <p className="muted typing"><span className="dots"><i /><i /><i /></span> Reading the message{t.images.length ? ' and photo' : ''}</p>}
+              {t.reply && <p className="bubble out rise">{t.reply}</p>}
+            </div>
+          ))}
         </div>
         {!m.reply && saved && (
           <form className="reply" onSubmit={(e) => { e.preventDefault(); void send() }}>
@@ -502,6 +517,7 @@ const CSS = `
 .photos.n2, .photos.n3, .photos.n4 { grid-template-columns: 1fr 1fr; }
 .photos img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--sunken); }
 .photos.n1 img { aspect-ratio: auto; max-height: 360px; }
+.turn { display: flex; flex-direction: column; gap: 8px; }
 .typing { display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .reply { padding: 12px 16px calc(env(safe-area-inset-bottom) + 14px); display: grid; gap: 6px; border-top: 1px solid var(--line); }
 .reply-box { display: flex; gap: 8px; align-items: flex-end; border: 1.5px dashed var(--line); border-radius: 18px; padding: 8px 8px 8px 14px; background: var(--surface); }

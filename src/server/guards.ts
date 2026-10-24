@@ -60,3 +60,19 @@ export function guardEvidence(brief: Record<string, any>, text: string, trustedP
   }
   return cleared
 }
+
+// A follow-up continues the brief: anything the conversation already settled (by the client,
+// the photo or the stylist's fix) stays settled unless the new message changes it.
+export function carryForward(brief: Record<string, any>, before: Record<string, any> | null): string[] {
+  if (!before) return []
+  const carried: string[] = []
+  brief.evidence ??= {}
+  for (const path of scalarPaths) {
+    const was = getPath(before, path)
+    if (was === undefined || was === "unknown" || getPath(brief, path) !== "unknown") continue
+    setPath(brief, path, was)
+    if (before.evidence?.[path]) brief.evidence[path] = before.evidence[path]
+    carried.push(path)
+  }
+  return carried
+}

@@ -25,6 +25,10 @@ export async function callBrief(opts: {
   // example. Every call that scores the locked test or trend sets must use it.
   record?: "full" | "off"
   corrections?: string
+  // Earlier turns of this client's conversation, oldest first: what they sent, and the brief
+  // as it stood after that turn (with the stylist's fixes and the reply they actually sent).
+  // The model then returns the brief for the whole conversation, not just the new message.
+  history?: { dm: { received_at: string; text: string; photo: { reader_output: ReaderTag[] } | null }; brief: Record<string, unknown> }[]
 }): Promise<BriefCallResult> {
   const started = Date.now()
   const res = await fetch(`${MUBIT_OPENAI_BASE}/chat/completions`, {
@@ -40,6 +44,10 @@ export async function callBrief(opts: {
       ...(opts.effort ? { reasoning_effort: opts.effort } : {}),
       messages: [
         { role: "system", content: instructionsFor(opts.profile, opts.tags) },
+        ...(opts.history ?? []).flatMap((turn) => [
+          { role: "user", content: userMessage(turn.dm) },
+          { role: "assistant", content: JSON.stringify(turn.brief) },
+        ]),
         { role: "user", content: userMessage(opts.dm, opts.corrections) },
       ],
     }),

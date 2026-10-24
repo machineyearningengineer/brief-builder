@@ -13,7 +13,7 @@ import colouristCorrections from "../../data/colourist/corrections.jsonl?raw"
 import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
 import { closestCorrections, correctionsBlock, type Correction } from "./corrections.ts"
-import { applyTrustedPhotoTags, guardEvidence } from "./guards.ts"
+import { applyTrustedPhotoTags, carryForward, guardEvidence } from "./guards.ts"
 import { readPhotos, type ReaderFix } from "./photo-reader.ts"
 
 const PROFILES = {
@@ -153,6 +153,20 @@ export class StylistRoom extends DurableObject<Env> {
     this.broadcast({ type: "message", message: m })
   }
 
+  // This client's earlier turns, oldest first, each with the brief as it stood afterwards:
+  // the stylist's fixes win over the draft, and the reply they actually sent wins over the
+  // drafted one. Capped so a long thread stays a reasonable size.
+  private history(m: RoomMessage) {
+    return this.messages()
+      .filter((x) => x.clientId === m.clientId && x.id !== m.id && x.createdAt < m.createdAt && (x.corrected ?? x.brief))
+      .slice(-6)
+      .map((x) => {
+        const b = { ...(x.corrected ?? x.brief)! }
+        if (x.reply) b.reply_draft = x.reply
+        return { dm: { received_at: x.receivedAt, text: x.text, photo: x.photoTags ? { reader_output: x.photoTags } : null }, brief: b }
+      })
+  }
+
   // The stylist's most recent photo corrections, one per field and wrong tag.
   private readerFixes(): ReaderFix[] {
     const rows = this.ctx.storage.sql.exec(`SELECT field, said, now FROM reader_fixes ORDER BY created_at DESC LIMIT 40`).toArray()
@@ -224,27 +238,34 @@ export class StylistRoom extends DurableObject<Env> {
     }
     const used = closestCorrections(m.text, this.correctionPool())
     const dm = { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null }
+    const history = this.history(m)
     const failed = (e: unknown) => ({ status: 0, ms: 0, requestId: null, brief: null, error: String(e), tokensIn: null, tokensOut: null })
     // The real draft, with this stylist's closest fixes, and the plain model alongside it for
     // the before-and-after. The plain call is never recorded, so it can't train the adapter.
+    // Both see the client's conversation so far, so a follow-up continues the same brief.
     const [result, plain] = await Promise.all([
-      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, corrections: correctionsBlock(used) }).catch(failed),
-      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, record: "off" }).catch(failed),
+      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, corrections: correctionsBlock(used) }).catch(failed),
+      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, record: "off" }).catch(failed),
     ])
     const plainBrief = plain.brief as Record<string, any> | null
     const baseline = plainBrief && typeof plainBrief.reply_draft === "string"
       ? { reply: plainBrief.reply_draft.replace(/\s*[—–]\s*/g, ", "), nextAction: String(plainBrief.next_action ?? ""), ms: plain.ms }
       : null
     const brief = result.brief as Record<string, any> | null
-    const trusted = new Set((m.photoTags ?? []).filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
-    if (brief && m.photoTags) {
+    // Photos sent earlier in the conversation still count: "does that include hair?" is about them.
+    const threadTags = [...history.flatMap((h) => h.dm.photo?.reader_output ?? []), ...(m.photoTags ?? [])]
+    const trusted = new Set(threadTags.filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
+    if (brief && threadTags.length) {
       // A tag the stylist has corrected away is never put back by the photo rule.
       const vetoed = new Set(this.readerFixes().map((f) => `${f.field}:${f.said}`))
-      applyTrustedPhotoTags(brief, m.photoTags.filter((t) => !vetoed.has(`${t.field}:${t.tag}`)), (tags as any).trust_threshold)
+      applyTrustedPhotoTags(brief, threadTags.filter((t) => !vetoed.has(`${t.field}:${t.tag}`)), (tags as any).trust_threshold)
       // A field the photo now answers is no longer something to ask about.
       if (Array.isArray(brief.missing)) brief.missing = brief.missing.filter((k: string) => brief.look?.[k] === undefined || brief.look[k] === "unknown")
     }
-    const guarded = brief ? guardEvidence(brief, m.text, trusted) : []
+    // Evidence can come from any message in the conversation, not just the newest one.
+    const said = [...history.map((h) => h.dm.text), m.text].join("\n")
+    const guarded = brief ? guardEvidence(brief, said, trusted) : []
+    if (brief) carryForward(brief, history.at(-1)?.brief ?? null)
     // House style for replies: no em dashes. Tidied here, not in the instructions, so the
     // Mubit task (keyed on the exact instructions) keeps its examples.
     if (brief && typeof brief.reply_draft === "string") brief.reply_draft = brief.reply_draft.replace(/\s*[—–]\s*/g, ", ")
@@ -291,6 +312,7 @@ export class StylistRoom extends DurableObject<Env> {
       key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low",
       dm: { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null },
       corrections: correctionsBlock([...own, ...others]),
+      history: this.history(m),
     }).catch(() => null)
     const latest = this.message(id)
     if (!latest?.corrected) return
