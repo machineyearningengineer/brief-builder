@@ -1,7 +1,7 @@
 // What code can decide exactly, it decides: what's still missing, the next step, dates from day
-// words, time windows in one vocabulary, whether the photo clashes with the text, and for the
-// braider whether her current hair needs a photo and whether hair is included. The model keeps the other judgement calls (a
-// consultation, declining or referring).
+// words, time windows in one vocabulary, whether the photo clashes with the text, and each house
+// rule that follows from the words alone (wig installs, children, consultations, soak-offs, infills,
+// design photos, possible infections). The model reads the DM and the photo and writes the reply.
 import type { StylistKey } from './stylists.ts'
 
 // Missing keys only the model can judge, from her rules and the photo.
@@ -142,12 +142,25 @@ export function hairIncluded(text: string): 'yes' | 'no' | null {
 
 // Her other rules that follow from the words alone. Each was checked against every label she has
 // written (training sets and saved corrections) before it was trusted here.
-const CHILD = /\b(my|for (my|her|his)) (son|daughter|kid|kids|child|little one|niece|nephew)\b|\b(son|daughter|niece|nephew)('s| is)? (is )?\d{1,2}\b|\b(he|she)('s| is) (only )?\d{1,2}\b|\bdo (u|you) do kids\b/i
+// A child's age: "my son", "she's 7", "my 8 year old". Ages go to 17, so "he's 25" is an adult.
+const CHILD = /\b(my|for (my|her|his)) (son|daughter|kid|kids|child|little one|niece|nephew)\b|\b(son|daughter|niece|nephew)('s| is)? (is )?\d{1,2}\b|\b(he|she)('s| is) (only )?(\d|1[0-7])\b|\bdo (u|you) do kids\b/i
+const AGE = /\b(\d{1,2})[\s-]?(year|yr)s?[\s-]?old\b|\b(he|she)('s| is) (only )?(\d{1,2})\b/i
+const age = (text: string) => { const m = text.match(AGE); return m ? Number(m[1] ?? m[5]) : null }
 const OTHER_SALON = /(from|at|by) (another|a different|other|somewhere|some other) (place|salon|shop)|somewhere else|another salon/i
 const OWN_WORK = /(they'?re|they are|it'?s|it was|were|was) (done )?(from|by|with) you|(you|u) did (them|it|my)|did them with you|done (by|with) you/i
-const DESIGN = /pinterest|tiktok|instagram|insta\b|this design|saw (it|this) on/i
+// A design to copy from social, not a mention of where she found the salon.
+const DESIGN = /pinterest|tiktok|this design|(saw|seen) (it|this|them) on/i
 const BITTEN = /\bbite\b|\bbitten\b|\bbiting\b|very short nails|really short nails/i
-const UNWELL = /\b(green|yellow)\b.*\bnail|\bnail.*\b(green|yellow)\b|infect|lifting.*discolou?r|discolou?r.*lifting/i
+// Signs of a problem, not a colour: "gone green under the gel", "swollen and red". "Yellow nails"
+// is a colour request.
+const UNWELL = /(gone|turned|going|turning) (a bit |slightly )?(green|yellow)|(green|yellow)(ish)? (patch|tinge|spot|mark|under)|infect|fung|mould|swollen|\bpus\b|lifting.*discolou?r|discolou?r.*lifting/i
+// "6 weeks ago", "6 weeks old", "a month ago": how long since the set.
+const weeksSince = (text: string) => {
+  const w = text.match(/(\d+)\s*(weeks?|wks?)\s*(ago|old)/i)
+  if (w) return Number(w[1])
+  const m = text.match(/(a|\d+)\s*months?\s*(ago|old)/i)
+  return m ? 4 * (m[1] === 'a' ? 1 : Number(m[1])) : null
+}
 const EXTENSIONS = ['acrylic_full_set', 'gel_extensions']
 
 function wordRules(stylist: StylistKey, brief: Record<string, any>, text: string): string[] {
@@ -160,6 +173,9 @@ function wordRules(stylist: StylistKey, brief: Record<string, any>, text: string
     else if (brief.next_action === 'decline' || brief.next_action === 'refer') brief.next_action = 'ask'
   }
   if (stylist === 'colourist') {
+    // Rule 7: under-16s are referred elsewhere.
+    const years = age(text)
+    if (years !== null && years < 16) brief.next_action = 'refer'
     // Rule 15: box-dyed or lightened hair needs a consultation first, roots and toners excepted.
     const history = brief.look?.history
     if ((history === 'box_dye' || history === 'previously_lightened') && brief.service !== 'root_touch_up' && brief.service !== 'toner') asks.push('consultation')
@@ -172,13 +188,14 @@ function wordRules(stylist: StylistKey, brief: Record<string, any>, text: string
     if (OWN_WORK.test(text)) brief.removal = 'own_work'
     else if (OTHER_SALON.test(text)) brief.removal = 'other_salon'
     // Rule 21: an infill more than three weeks after the set is a new full set.
-    const weeks = text.match(/(\d+)\s*(weeks?|wks?)\s*ago/i)
-    if (brief.service === 'acrylic_infill' && weeks && Number(weeks[1]) > 3) brief.service = 'acrylic_full_set'
+    const weeks = weeksSince(text)
+    if (brief.service === 'acrylic_infill' && weeks !== null && weeks > 3) brief.service = 'acrylic_full_set'
     // Rules 22 and 18: a design from social needs its photo; bitten nails need a photo before extensions.
     if (DESIGN.test(text)) asks.push('design_photo')
     if (BITTEN.test(text) && EXTENSIONS.includes(brief.service)) asks.push('nail_photo')
-    // Rule 19: possible infection is never booked; she refers them kindly.
-    if (UNWELL.test(text)) brief.next_action = 'refer'
+    // Rule 19: possible infection is never booked; she refers them kindly. Rule 7: under-12s too.
+    const years = age(text)
+    if (UNWELL.test(text) || (years !== null && years < 12)) brief.next_action = 'refer'
   }
   return asks
 }
