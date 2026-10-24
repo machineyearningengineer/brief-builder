@@ -112,15 +112,17 @@ const CSS = `
 .lead { font-size: clamp(18px, 2.4vw, 22px); margin: 0; color: var(--muted); }
 .small { font-size: 13px; margin: 0; }
 .proof { display: grid; gap: 16px; padding: 24px; border-radius: 22px; background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--line); }
-.big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+.big { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 20px; }
 .big .num { font-family: var(--display); font-weight: 750; font-size: clamp(56px, 10vw, 96px); line-height: 0.9; letter-spacing: -0.03em; color: var(--accent); font-variant-numeric: tabular-nums; }
-.big .what { font-size: 18px; max-width: 26ch; }
+.big .what { font-size: 18px; max-width: 24ch; text-wrap: balance; padding-bottom: 0.35em; }
 .steps .track { position: relative; height: 12px; border-radius: 12px; background: var(--sunken); overflow: hidden; }
 .steps .track i { position: absolute; inset: 0 auto 0 0; border-radius: 12px; }
 .steps .now { background: var(--accent); }
 .steps .fixes { background: color-mix(in oklch, var(--accent) 45%, var(--sunken)); }
 .steps .plain { background: var(--faint); }
 .steps dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 12px 0 0; }
+/* Numbers share one baseline even when a label wraps. */
+.steps dl div { display: flex; flex-direction: column; justify-content: flex-end; }
 .steps dt { font-size: 13px; color: var(--muted); }
 .steps dd { margin: 2px 0 0; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .steps dd.accent { color: var(--accent); }

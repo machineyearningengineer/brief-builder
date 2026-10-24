@@ -307,6 +307,8 @@ const STAGE_CSS = `
 .track .plain { background: var(--faint); }
 dl { margin: 0; }
 .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+/* Numbers share one baseline even when a label wraps. */
+.steps div { display: flex; flex-direction: column; justify-content: flex-end; }
 .steps dt, .pair dt { font-size: 14px; color: var(--muted); }
 .steps dd { margin: 2px 0 0; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .steps dd.accent, .pair b, .moves b { color: var(--accent); }
