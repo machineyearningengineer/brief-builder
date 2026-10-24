@@ -1,0 +1,8 @@
+{
+  "checkedAt": "Sat 24 Oct, 02:00",
+  "note": "Read by hand from the Mubit console (Adapters page); adapters can't be queried by API yet.",
+  "adapters": {
+    "braider": { "version": "v1", "base": "Qwen3-4B-Instruct", "quality": 50, "target": 95, "tests": 12, "kept": 52, "state": "Silent test on 10% of live calls" },
+    "colourist": { "version": "v1", "base": "Qwen3-4B-Instruct", "quality": 33, "target": 95, "tests": 12, "kept": 25, "state": "Silent test on 10% of live calls" }
+  }
+}

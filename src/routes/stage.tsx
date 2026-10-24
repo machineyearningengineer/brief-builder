@@ -2,7 +2,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import scoreboard from '../shared/scoreboard.json'
-import { stylistToken, useRoom } from '../client/room.ts'
+import { imageUrlForStylist, stylistToken, useRoom } from '../client/room.ts'
+import mubit from '../shared/mubit-status.json'
+import type { RoomMessage } from '../shared/stylists.ts'
 import { Qr } from '../client/qr.tsx'
 import { STYLISTS, type StylistKey } from '../shared/stylists.ts'
 
@@ -36,6 +38,8 @@ function Stage() {
   const { messages, connected } = useRoom(stylist, token ? { token } : null)
   const latest = messages.at(-1)
   const fixes = messages.filter((m) => m.corrected).length
+  const lastFix = [...messages].reverse().find((m) => m.corrected && m.changed.length)
+  const adapter = (mubit.adapters as Record<string, { version: string; base: string; quality: number; target: number; tests: number; kept: number; state: string }>)[stylist]
   const board = BOARDS[stylist]
   const base = board?.base
   const fixed = board?.corrected
@@ -95,7 +99,8 @@ function Stage() {
         {!token && <p className="muted">Open the inbox once on this laptop to connect the live view.</p>}
         {latest ? (
           <div className="latest rise" key={latest.id + latest.status}>
-            <p className="dm">“{latest.text}”</p>
+            {latest.images.length > 0 && token && <StagePhoto stylist={stylist} id={latest.images[0]} token={token} />}
+            {latest.text && <p className="dm">“{latest.text}”</p>}
             {latest.status === 'drafting' && <p className="muted"><span className="dots"><i /><i /><i /></span> Drafting through Mubit…</p>}
             {latest.brief && (
               <p className="facts">
@@ -121,10 +126,53 @@ function Stage() {
             )}
           </div>
         ) : token && <p className="muted">Scan the QR code and send a DM.</p>}
+        {lastFix && <FixLine m={lastFix} name={STYLISTS[stylist].name.split(' ')[0]} />}
+        {adapter && (
+          <div className="mubit">
+            <p className="eyebrow">Mubit model for {STYLISTS[stylist].name.split(' ')[0]}</p>
+            <p><b>{adapter.version}</b> on {adapter.base} · trained on {adapter.kept}+ kept examples</p>
+            <div className="meter" aria-label={`${adapter.quality}% of target`}><i style={{ width: `${adapter.quality}%` }} /><span style={{ left: `${adapter.target}%` }} /></div>
+            <p className="muted">Matches the big model on {adapter.quality}% of {adapter.tests} test cases (target {adapter.target}%). {adapter.state}. Checked {mubit.checkedAt}.</p>
+          </div>
+        )}
         <p className="count"><b>{fixes}</b> fixes this session · each one recorded by Mubit for the adapter</p>
       </section>
       <style>{STAGE_CSS}</style>
     </main>
+  )
+}
+
+function StagePhoto({ stylist, id, token }: { stylist: StylistKey; id: string; token: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    let made: string | null = null
+    imageUrlForStylist(stylist, id, token).then((u) => {
+      made = u
+      setUrl(u)
+    })
+    return () => {
+      if (made) URL.revokeObjectURL(made)
+    }
+  }, [stylist, id, token])
+  return url ? <img className="stage-photo" src={url} alt="The client's photo" /> : null
+}
+
+const say = (v: unknown) => (Array.isArray(v) ? v.join(', ') || 'none' : v === 'unknown' || v == null ? 'not set' : String(v)).replaceAll('_', ' ')
+
+// The most recent correction, said the way the stylist made it.
+function FixLine({ m, name }: { m: RoomMessage; name: string }) {
+  const path = m.changed[0]
+  const get = (o: any) => path.split('.').reduce((v, k) => v?.[k], o)
+  const label = path.split('.').pop()!.replace('_', ' ')
+  const before = get(m.brief)
+  const after = get(m.corrected)
+  const detail = Array.isArray(before) && Array.isArray(after)
+    ? `${before.filter((x) => !after.includes(x)).map(say).join(', ') || 'none'} → ${after.filter((x) => !before.includes(x)).map(say).join(', ') || 'removed'}`
+    : `${say(before)} → ${say(after)}`
+  return (
+    <p className="fixline settle" key={m.id + path}>
+      <b>{name} fixed {label}</b> {detail}{m.changed.length > 1 ? ` (+${m.changed.length - 1} more)` : ''}
+    </p>
   )
 }
 
@@ -169,6 +217,14 @@ const STAGE_CSS = `
 .latest .dm { font-size: 22px; margin: 0; }
 .facts { margin: 0; font-weight: 600; font-size: 18px; }
 .facts span { color: var(--accent); }
+.stage-photo { width: 120px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; float: right; margin-left: 12px; }
+.fixline { border-left: 3px solid var(--good); border-radius: 0; padding: 6px 12px; background: var(--good-soft); font-size: 16px; }
+.fixline b { color: var(--good); margin-right: 6px; }
+.mubit { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 6px; background: var(--surface); }
+.mubit p { margin: 0; }
+.meter { position: relative; height: 10px; border-radius: 5px; background: var(--sunken); overflow: visible; }
+.meter i { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+.meter span { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--ink); }
 .versus { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 6px; }
 .side { border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; align-content: start; font-size: 15px; line-height: 1.45; }
 .side.plain { background: var(--sunken); color: var(--muted); }
