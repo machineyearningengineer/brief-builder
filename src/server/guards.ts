@@ -57,7 +57,9 @@ export function guardEvidence(brief: Record<string, any>, text: string, trustedP
     const value = getPath(brief, path)
     if (value === undefined || value === "unknown") continue
     const quote = evidence[path]
-    const ok = quote === "[photo]" ? trustedPhotoFields.has(path.split(".").pop()!) : quote === "[earlier]" || (!!quote && haystack.includes(quote.toLowerCase()))
+    // "[earlier]" from the model counts for nothing: carryForward, which runs after this, restores
+    // a value only when the conversation really settled it.
+    const ok = quote === "[photo]" ? trustedPhotoFields.has(path.split(".").pop()!) : !!quote && quote !== "[earlier]" && haystack.includes(quote.toLowerCase())
     if (!ok) {
       setPath(brief, path, "unknown")
       delete evidence[path]
