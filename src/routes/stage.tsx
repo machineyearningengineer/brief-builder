@@ -1,5 +1,5 @@
 // The projector view, read left to right at 1920×1080: the measured result, then the live room.
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import scoreboard from '../shared/scoreboard.json'
 import { imageUrlForStylist, stylistToken, useRoom } from '../client/room.ts'
@@ -82,12 +82,12 @@ function Stage() {
   return (
     <main className="stage">
       <nav className="top" aria-label="Stylist">
-        <b className="mark">Brief Builder</b>
+        <Link to="/" className="mark">Brief Builder</Link>
         <span className={connected ? 'dot on' : 'dot'} title={connected ? 'Live' : 'Connecting'} />
         <div className="switch">
           {(Object.keys(STYLISTS) as StylistKey[]).map((s) => (
             <button key={s} className={s === stylist ? 'btn primary' : 'btn'} onClick={() => setStylist(s)} aria-pressed={s === stylist} aria-label={STYLISTS[s].name}>
-              <span className="long">{STYLISTS[s].name}</span><span className="short">{STYLISTS[s].owner}</span>
+              {STYLISTS[s].owner}
             </button>
           ))}
         </div>
@@ -260,12 +260,13 @@ function FixLine({ m, first }: { m: RoomMessage; first: string }) {
 const STAGE_CSS = `
 .stage { height: 100dvh; padding: 24px 48px 36px; display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 20px 48px; overflow: hidden; }
 .top { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; }
-.mark { font-family: var(--display); font-size: 20px; letter-spacing: -0.01em; }
+.mark { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -0.01em; color: var(--ink); text-decoration: none; }
+.mark:hover { color: var(--accent); }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
 .dot.on { background: var(--good); }
-.switch { margin-left: auto; display: flex; gap: 8px; }
-.switch .btn { white-space: nowrap; }
-.switch .short { display: none; }
+.switch { margin-left: auto; display: grid; grid-template-columns: repeat(3, minmax(96px, 1fr)); gap: 4px; padding: 4px; border-radius: 99px; background: var(--sunken); }
+.switch .btn { border: 0; background: transparent; padding: 9px 18px; white-space: nowrap; }
+.switch .btn.primary { background: var(--accent); }
 .join { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 10px; padding: 28px; border-radius: 28px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .join .qr { padding: 14px; border-radius: 20px; background: oklch(100% 0 0); line-height: 0; align-self: stretch; display: grid; place-items: center; }
 .join .qr svg { width: 100%; height: auto; max-width: 460px; }
@@ -329,11 +330,8 @@ dl { margin: 0; }
 .model .meter s { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
 @media (max-width: 700px) {
   .top { flex-wrap: wrap; }
-  .switch { margin-left: 0; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 99px; background: var(--sunken); }
-  .switch .btn { border: 0; background: transparent; padding: 10px 0; }
-  .switch .btn.primary { background: var(--accent); }
-  .switch .long { display: none; }
-  .switch .short { display: inline; }
+  .switch { margin-left: 0; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .switch .btn { padding: 10px 0; }
 }
 @media (max-width: 1280px) { .stage { height: auto; overflow: visible; grid-template-columns: minmax(0, 1fr); padding: 20px 16px; } .join .qr svg { max-width: 280px; }  }
 `
