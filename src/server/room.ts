@@ -35,6 +35,7 @@ const PHOTO_LIKENESS = 0.5
 // A draft or re-draft still unfinished after this long is retried once by the alarm, then failed.
 // Longer than one model call's whole budget (photo reader plus brief), so it never races a live call.
 const STUCK_MS = 200_000
+const SIGN_OFF: Record<StylistKey, string> = { braider: "Amara x", colourist: "Lou", nails: "Jade x" }
 const MAX_DM = 1000
 const MAX_CORRECTION_BYTES = 8_000
 const DM_PER_WINDOW = 8
@@ -82,6 +83,7 @@ export class StylistRoom extends DurableObject<Env> {
     if (!cols.includes("sent_price")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN sent_price INTEGER`)
     if (!cols.includes("extra")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN extra TEXT`)
     if (!cols.includes("hidden")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN hidden INTEGER`)
+    if (!cols.includes("booking")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN booking TEXT`)
     // Drafts and re-drafts in flight. An alarm finishes or fails any left behind by a restart.
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS inflight (id TEXT, kind TEXT, started_at INTEGER, attempts INTEGER, PRIMARY KEY (id, kind))`)
     // Clients whose threads the stylist keeps off the stage, including their later messages.
@@ -129,6 +131,7 @@ export class StylistRoom extends DurableObject<Env> {
       case "reset": return this.reset()
       case "hide": return this.hide(body)
       case "retry": return this.retry(body)
+      case "book": return this.book(body)
       default: return new Response("Not found", { status: 404 })
     }
   }
@@ -173,10 +176,10 @@ export class StylistRoom extends DurableObject<Env> {
   private save(m: RoomMessage) {
     this.ctx.storage.sql.exec(
       `INSERT OR REPLACE INTO messages (id, client_id, created_at, received_at, text, photo, status, brief, corrected, changed,
-        reply, request_id, ms, corrections_used, guarded, images, baseline, redrafting, edit_share, sent_price, extra, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reply, request_id, ms, corrections_used, guarded, images, baseline, redrafting, edit_share, sent_price, extra, hidden, booking) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       m.id, m.clientId, m.createdAt, m.receivedAt, m.text, JSON.stringify(m.photoTags), m.status, JSON.stringify(m.brief),
       JSON.stringify(m.corrected), JSON.stringify(m.changed), m.reply, m.requestId, m.ms, m.correctionsUsed, JSON.stringify(m.guarded),
-      JSON.stringify(m.images), JSON.stringify(m.baseline), m.redrafting ? 1 : 0, m.editShare, m.sentPrice, JSON.stringify(m.extra ?? []), m.hidden ? 1 : 0,
+      JSON.stringify(m.images), JSON.stringify(m.baseline), m.redrafting ? 1 : 0, m.editShare, m.sentPrice, JSON.stringify(m.extra ?? []), m.hidden ? 1 : 0, JSON.stringify(m.booking ?? null),
     )
     this.broadcast({ type: "message", message: m })
   }
@@ -283,7 +286,7 @@ export class StylistRoom extends DurableObject<Env> {
       id: key ?? crypto.randomUUID(), clientId: String(body.clientId).slice(0, 64), createdAt: Date.now(),
       receivedAt: londonTimestamp(new Date()), text, photoTags: null, images, status: draft ? "drafting" : "failed",
       brief: null, corrected: null, changed: [], reply: null, requestId: null, ms: null, correctionsUsed: 0, guarded: [], baseline: null,
-      redrafting: false, editShare: null, sentPrice: null, extra: [],
+      redrafting: false, editShare: null, sentPrice: null, extra: [], booking: null,
       hidden: this.ctx.storage.sql.exec(`SELECT 1 FROM hidden_clients WHERE client_id = ?`, body.clientId).toArray().length > 0,
     }
     this.save(m)
@@ -477,6 +480,36 @@ export class StylistRoom extends DurableObject<Env> {
     this.save({ ...latest, corrected, redrafting: false })
   }
 
+  // She confirms the booking: the client gets one clear message with the day, time, what's
+  // booked and the total from her price list, and every screen shows it as booked.
+  private book(body: { id?: string; date?: string; time?: string }) {
+    const m = body.id ? this.message(body.id) : null
+    const date = String(body.date ?? "")
+    const time = String(body.time ?? "")
+    if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return Response.json({ error: "Pick a day and a time." }, { status: 400 })
+    const brief = m.corrected ?? m.brief
+    const price = brief ? estimate(this.stylist!, brief) : null
+    const SAID: Record<string, string> = {
+      butt: "bum length", waist: "waist length", mid_back: "mid-back", bra_strap: "bra-strap length", shoulder: "shoulder length",
+      box_braids: "box braids", french_curls: "French curls", curly_ends: "curly ends", boho_throughout: "boho curls throughout",
+      lived_in_blonde: "lived-in blonde", acrylic_full_set: "acrylic set", gel_extensions: "gel extensions", biab: "BIAB", xl: "extra long", cat_eye: "cat eye",
+    }
+    const words = (v: unknown) => SAID[String(v)] ?? String(v).replaceAll("_", " ")
+    const look = brief?.look ?? {}
+    const summary = [brief?.service, look.length, look.size ?? look.shade, look.ends, look.shape, look.finish]
+      .filter((v) => v && v !== "unknown" && v !== "straight" && v !== "plain").map(words).join(", ")
+    const day = new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" })
+    const [h, min] = time.split(":").map(Number)
+    const clock = `${h % 12 || 12}${min ? `:${String(min).padStart(2, "0")}` : ""}${h < 12 ? "am" : "pm"}`
+    const sign = SIGN_OFF[this.stylist!]
+    const total = price && !price.from ? `£${price.amount}` : price ? `from £${price.amount}` : null
+    const text = `You’re booked in for ${day} at ${clock}${summary ? `: ${summary}` : ""}${total ? `, ${total}` : ""}${price?.note ? ` (${price.note})` : ""}. See you then! ${sign}`
+    const booking = { date, time, total: price?.amount ?? null, summary }
+    const done = m.reply ? { ...m, extra: [...m.extra, text].slice(-4), booking } : { ...m, reply: text, status: "replied" as const, booking }
+    this.save(done)
+    return Response.json({ booking })
+  }
+
   // Drafts a failed message again, when the stylist asks.
   private retry(body: { id?: string }) {
     const m = body.id ? this.message(body.id) : null
@@ -645,7 +678,7 @@ function toMessage(r: Record<string, any>): RoomMessage {
     photoTags: JSON.parse(r.photo), status: r.status, brief: JSON.parse(r.brief), corrected: JSON.parse(r.corrected),
     changed: JSON.parse(r.changed ?? "[]"), reply: r.reply, requestId: r.request_id, ms: r.ms,
     correctionsUsed: r.corrections_used ?? 0, guarded: JSON.parse(r.guarded ?? "[]"), images: JSON.parse(r.images ?? "[]") ?? [], baseline: JSON.parse(r.baseline ?? "null"), redrafting: !!r.redrafting,
-    editShare: r.edit_share ?? null, sentPrice: r.sent_price ?? null, extra: JSON.parse(r.extra ?? "[]") ?? [], hidden: !!r.hidden,
+    editShare: r.edit_share ?? null, sentPrice: r.sent_price ?? null, extra: JSON.parse(r.extra ?? "[]") ?? [], hidden: !!r.hidden, booking: JSON.parse(r.booking ?? "null"),
   }
 }
 

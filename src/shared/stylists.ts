@@ -40,6 +40,8 @@ export type RoomMessage = {
   extra: string[]
   // Kept off the projector: the stylist hid this client's thread from the stage.
   hidden: boolean
+  // Set when she confirms the booking: the day, time and total the client was sent.
+  booking: { date: string; time: string; total: number | null; summary: string } | null
 }
 
 export type RoomEvent = { type: "message"; message: RoomMessage } | { type: "reset" }

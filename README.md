@@ -42,6 +42,10 @@ flowchart LR
 - **Photos like this one.** A photo fix applies only to new photos that look like the one she fixed.
 - **The conversation keeps going.** Follow-ups build on what’s settled. If a fix changes a price she
   already sent, it offers the client a one-tap correction.
+- **One tap books it.** When the client picks a time, “Confirm booking” sends them the day, time,
+  what’s booked and the total from her price list, and the stage shows it as booked.
+- **The room sees every state.** The stage shows drafting, her draft, re-drafting with her fix (the old
+  value struck through, the new price picked out), sent, and booked, with a Live/Reconnecting/Offline pill.
 - **A closest yes for every no.** Over budget, or a service she doesn’t do, the sheet offers the
   nearest thing she can say yes to, from her price list.
 

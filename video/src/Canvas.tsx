@@ -5,7 +5,7 @@ import { Easing, Img, interpolate, staticFile, useCurrentFrame } from "remotion"
 import capture from "./capture.json"
 import { Card, Count, Eyebrow, Rise, Source, Typed, t, useRise } from "./ui.tsx"
 
-export const CANVAS_FRAMES = 1050
+export const CANVAS_FRAMES = 1290
 export const CLOSEST_FRAMES = 360
 
 const SPOKEN: Record<string, string> = { knotless: "Knotless", butt: "Bum length", medium: "Medium", smedium: "Smedium", small: "Small", large: "Large", waist: "Waist length" }
@@ -17,7 +17,7 @@ const CAM: [number, number, number, number][] = [
   [0, 235, 450, 1.12], [100, 235, 450, 1.12], [150, 880, 470, 1.16], [230, 880, 470, 1.16],
   [270, 1520, 300, 1.45], [340, 1520, 300, 1.45], [385, 880, 330, 2.0], [450, 880, 330, 2.0],
   [525, 875, 420, 0.95], [690, 875, 420, 0.95], [760, 1100, 960, 0.6], [800, 1100, 960, 0.6],
-  [850, 880, 1380, 1.0], [940, 880, 1380, 1.0], [990, 1825, 1380, 0.98], [1050, 1825, 1380, 0.98],
+  [850, 880, 1380, 1.0], [940, 880, 1380, 1.0], [990, 2100, 1360, 1.3], [1100, 2100, 1360, 1.3], [1150, 1825, 1380, 0.98], [1290, 1825, 1380, 0.98],
 ]
 const ease = Easing.bezier(0.65, 0, 0.35, 1)
 function camera(f: number) {
@@ -60,7 +60,8 @@ export function InboxCanvas() {
       <Overlay from={380} to={515}>The reader said {say(capture.hero.firstSize).toLowerCase()}. She can see it’s {say(capture.hero.fixedSize).toLowerCase()}.</Overlay>
       <Overlay from={525} to={700}>One tap. The price and the reply follow.</Overlay>
       <Overlay from={770} to={950}>The next client gets it right first time.</Overlay>
-      <Overlay from={960} to={1050}>And it writes like her.</Overlay>
+      <Overlay from={975} to={1105}>She rewrote one draft last week.</Overlay>
+      <Overlay from={1150} to={1290}>Now every draft sounds like her.</Overlay>
     </div>
   )
 }
@@ -195,19 +196,24 @@ function NextClient() {
         </Card>
       </Rise>
       <Rise at={810} style={{ position: "absolute", left: 1290, top }}>
-        <ReplyCard x={0} y={0} label="Draft reply" first={capture.nextClient.reply} typeAt={815} mark={960} />
+        <ReplyCard x={0} y={0} label="Draft reply" first={capture.nextClient.reply} typeAt={815} mark={1140} />
       </Rise>
     </>
   )
 }
 
 function VoiceCard() {
+  const f = useCurrentFrame()
+  const strike = interpolate(f, [1005, 1030], [0, 100], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })
   return (
     <Rise at={955} style={{ position: "absolute", left: 1840, top: 1170, width: 520 }}>
       <Card style={{ padding: "28px 30px", display: "grid", gap: 14 }}>
         <Eyebrow>A draft she rewrote last week</Eyebrow>
-        <p style={{ margin: 0, fontSize: 21, lineHeight: 1.45, color: t.faint, textDecoration: "line-through" }}>Hi! Medium knotless braids at mid-back length are £140, with hair not included.</p>
-        <p style={{ margin: 0, fontSize: 21, lineHeight: 1.45 }}><Voiced text="Hiya lovely 💕 medium knotless to mid-back is £140, hair not included hun. Amara x" /></p>
+        <p style={{ margin: 0, fontSize: 21, lineHeight: 1.45, color: f > 1005 ? t.faint : t.muted, textDecoration: strike > 50 ? "line-through" : "none", transition: "none" }}>Hi! Medium knotless braids at mid-back length are £140, with hair not included.</p>
+        <Rise at={1035}>
+          <Eyebrow style={{ color: t.accent }}>What she sent</Eyebrow>
+          <p style={{ margin: "8px 0 0", fontSize: 21, lineHeight: 1.45 }}><Voiced text="Hiya lovely 💕 medium knotless to mid-back is £140, hair not included hun. Amara x" /></p>
+        </Rise>
       </Card>
     </Rise>
   )

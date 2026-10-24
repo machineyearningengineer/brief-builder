@@ -474,6 +474,7 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
               <div className="line"><span className="k">Where</span><span className="v">{brief.area || <span className="faint">Not said</span>}</span></div>
               <div className="line"><span className="k">People</span><span className="v">{brief.people ?? 1}</span></div>
               <div className="line"><span className="k">Budget</span><span className="v">{brief.budget_max_gbp ? `Up to £${brief.budget_max_gbp}` : <span className="faint">Not said</span>}</span></div>
+              <BookIt m={m} thread={thread} brief={brief} stylist={stylist} token={token} />
             </div>
 
             {m.photoTags && (
@@ -513,6 +514,33 @@ function Detail({ thread, stylist, token, onBack }: { thread: RoomMessage[]; sty
 }
 
 // Marks each evidence quote where it appears in the DM, so every value shows its source.
+// The last step: she confirms the day and time, and the client gets one clear confirmation.
+function BookIt({ m, thread, brief, stylist, token }: { m: RoomMessage; thread: RoomMessage[]; brief: Record<string, any>; stylist: StylistKey; token: string }) {
+  const booked = [...thread].reverse().find((t) => t.booking)?.booking
+  const window = typeof brief.when?.window === 'string' && /^\d{2}:\d{2}$/.test(brief.when.window) ? brief.when.window : ''
+  const [date, setDate] = useState<string>(brief.when?.dates?.[0] ?? '')
+  const [time, setTime] = useState<string>(window)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { setDate(brief.when?.dates?.[0] ?? ''); setTime(window) }, [m.id, brief.when?.dates?.[0], window])
+  if (booked) {
+    const day = new Date(`${booked.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+    return <p className="booked settle">✓ Booked · {day}, {booked.time}{booked.total != null ? ` · £${booked.total}` : ''}</p>
+  }
+  const book = async () => {
+    setBusy(true)
+    try { await post(stylist, 'book', { id: m.id, date, time }, token) } finally { setBusy(false) }
+  }
+  return (
+    <form className="book" onSubmit={(e) => { e.preventDefault(); void book() }}>
+      <label className="sr-only" htmlFor={`book-day-${m.id}`}>Day</label>
+      <input id={`book-day-${m.id}`} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <label className="sr-only" htmlFor={`book-time-${m.id}`}>Time</label>
+      <input id={`book-time-${m.id}`} type="time" step={900} value={time} onChange={(e) => setTime(e.target.value)} />
+      <button className="btn primary" type="submit" disabled={!date || !time || busy}>Confirm booking</button>
+    </form>
+  )
+}
+
 // After a reply has gone, a fix that changes the price offers the client a one-tap correction.
 function PriceCorrection({ m, stylist, token }: { m: RoomMessage; stylist: StylistKey; token: string }) {
   const now = estimate(stylist, m.corrected ?? m.brief)?.amount
@@ -573,6 +601,10 @@ const CSS = `
 .who-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; margin: 0 8px 12px; border-radius: 99px; background: var(--sunken); }
 .who-switch a { text-align: center; padding: 7px 0; border-radius: 99px; font-weight: 600; font-size: 14px; color: var(--muted); text-decoration: none; }
 .who-switch a.on { background: var(--accent); color: var(--on-accent); }
+.book { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.book input { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--surface); color: var(--ink); font: inherit; }
+.book .btn { flex: 1 0 auto; }
+.booked { margin: 10px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--good-soft); color: var(--good); font-weight: 700; }
 .failed { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--muted); }
 .thread-bar .stage-toggle { margin-left: auto; font-size: 13px; padding: 6px 12px; }
 .thread-bar .stage-toggle.off { border-color: var(--accent); color: var(--accent); }

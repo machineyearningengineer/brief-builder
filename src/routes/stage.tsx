@@ -125,7 +125,7 @@ function Stage() {
         )}
         {latest ? (
           <>
-            <Latest m={latest} photo={[...messages].reverse().find((x) => x.clientId === latest.clientId && x.images.length)?.images[0]} stylist={stylist} token={token} first={first} />
+            <Latest m={latest} booking={[...messages].reverse().find((x) => x.clientId === latest.clientId && x.booking)?.booking ?? null} photo={[...messages].reverse().find((x) => x.clientId === latest.clientId && x.images.length)?.images[0]} stylist={stylist} token={token} first={first} />
             {lastFix && <FixLine m={lastFix} first={first} />}
             <VoiceLine messages={messages} first={first} />
           </>
@@ -208,7 +208,7 @@ function Model({ adapter, first, fixes }: { adapter?: Adapter; first: string; fi
   )
 }
 
-function Latest({ m, photo, stylist, token, first }: { m: RoomMessage; photo?: string; stylist: StylistKey; token: string; first: string }) {
+function Latest({ m, booking, photo, stylist, token, first }: { m: RoomMessage; booking: RoomMessage['booking']; photo?: string; stylist: StylistKey; token: string; first: string }) {
   const brief = m.corrected ?? m.brief
   // Each chip knows its field, so a field she fixed can show what it was.
   const fields = ['service', 'look.length', brief?.look?.size !== undefined ? 'look.size' : 'look.shade', 'look.shape', 'look.finish']
@@ -254,6 +254,15 @@ function Latest({ m, photo, stylist, token, first }: { m: RoomMessage; photo?: s
               <p className="arrive glow" key={brief.reply_draft}>{fixedReply ? <Changed before={original} after={brief.reply_draft} values={facts.filter((f) => f.was !== undefined).map((f) => say(f.now))} /> : brief.reply_draft}</p>
             </div>
           )}
+        </div>
+      )}
+      {booking && (
+        <div className="ticket" key={booking.date + booking.time}>
+          <span className="tick">✓</span>
+          <div>
+            <b>Booked · {new Date(`${booking.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })}, {booking.time}</b>
+            <span>{booking.summary}{booking.total != null ? ` · £${booking.total}` : ''}</span>
+          </div>
         </div>
       )}
     </div>
@@ -362,6 +371,11 @@ mark.new { background: var(--good-soft); color: var(--good); font-weight: 700; b
 .side.ours.sent { background: var(--good-soft); outline-color: var(--good); }
 .side.ours.sent b { color: var(--good); }
 .side .extra { padding-top: 8px; border-top: 1px dashed var(--line); }
+.ticket { display: flex; gap: 14px; align-items: center; padding: 16px 18px; border-radius: 18px; background: var(--good-soft); border: 1.5px solid var(--good); }
+.ticket .tick { width: 34px; height: 34px; border-radius: 34px; display: grid; place-items: center; background: var(--good); color: var(--on-accent); font-weight: 700; flex: none; }
+.ticket div { display: grid; gap: 2px; }
+.ticket b { font-size: 20px; color: var(--good); }
+.ticket span { color: var(--ink); }
 /* State changes, each with its own small motion. Off when the viewer asks for less motion. */
 .skeleton i { display: block; height: 12px; border-radius: 6px; background: var(--line); }
 .skeleton i:nth-of-type(2) { width: 86%; }
@@ -382,6 +396,8 @@ mark.new { background: var(--good-soft); color: var(--good); font-weight: 700; b
   .pop { animation: pop 360ms var(--ease) both; }
   .side.ours.sent { animation: sent 480ms var(--ease) both; }
   .side.ours.sent .tick { animation: pop 420ms 120ms var(--ease) both; }
+  .ticket { animation: sent 520ms var(--ease) both; }
+  .ticket .tick { animation: pop 480ms 160ms var(--ease) both; }
   .fixline { animation: slide-in 420ms var(--ease) both; }
   .model .bump { display: inline-block; animation: pop 420ms var(--ease) both; }
 }
