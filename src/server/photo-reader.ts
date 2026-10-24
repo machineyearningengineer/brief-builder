@@ -5,6 +5,16 @@ import { BRIEF_MODEL, MUBIT_OPENAI_BASE } from "./brief-call.ts"
 
 type Tags = { trust_threshold: number; reader_fields: string[]; fields: Record<string, string[]> }
 export type ReaderTag = { field: string; tag: string; confidence: number }
+// The stylist overruled the reader: it said `said` for `field`, and the photo showed `now`.
+export type ReaderFix = { field: string; said: string; now: string }
+
+// The stylist's photo corrections go in the user message, not the instructions, so the
+// reader's Mubit task keeps one fingerprint and its corrected answers become training data.
+function fixesNote(fixes: ReaderFix[]): string {
+  if (!fixes.length) return ""
+  const lines = fixes.slice(0, 12).map((f) => (f.now === "none" ? `- ${f.field}: you said "${f.said}", but it wasn't there` : `- ${f.field}: you said "${f.said}", the photo showed "${f.now}"`))
+  return `\n\nThis stylist corrected earlier photo reads. Don't repeat these mistakes:\n${lines.join("\n")}`
+}
 
 function instructions(tags: Tags): string {
   const lines = tags.reader_fields.map((f) => `- ${f}: ${tags.fields[f].join(", ")}`).join("\n")
@@ -25,7 +35,7 @@ function base64(bytes: ArrayBuffer): string {
   return btoa(s)
 }
 
-export async function readPhotos(opts: { key: string; tags: Tags; photos: { mime: string; bytes: ArrayBuffer }[] }): Promise<ReaderTag[] | null> {
+export async function readPhotos(opts: { key: string; tags: Tags; photos: { mime: string; bytes: ArrayBuffer }[]; fixes?: ReaderFix[] }): Promise<ReaderTag[] | null> {
   if (!opts.photos.length) return null
   const res = await fetch(`${MUBIT_OPENAI_BASE}/chat/completions`, {
     method: "POST",
@@ -39,7 +49,7 @@ export async function readPhotos(opts: { key: string; tags: Tags; photos: { mime
         {
           role: "user",
           content: [
-            { type: "text", text: "What do these photos show?" },
+            { type: "text", text: `What do these photos show?${fixesNote(opts.fixes ?? [])}` },
             ...opts.photos.map((p) => ({ type: "image_url", image_url: { url: `data:${p.mime};base64,${base64(p.bytes)}` } })),
           ],
         },

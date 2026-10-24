@@ -14,7 +14,7 @@ import type { RoomEvent, RoomMessage, StylistKey } from "../shared/stylists.ts"
 import { callBrief } from "./brief-call.ts"
 import { closestCorrections, correctionsBlock, type Correction } from "./corrections.ts"
 import { applyTrustedPhotoTags, guardEvidence } from "./guards.ts"
-import { readPhotos } from "./photo-reader.ts"
+import { readPhotos, type ReaderFix } from "./photo-reader.ts"
 
 const PROFILES = {
   braider: { profile: braiderProfile, tags: braiderTags, seedCorrections: braiderCorrections },
@@ -53,6 +53,8 @@ export class StylistRoom extends DurableObject<Env> {
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS corrections (id TEXT PRIMARY KEY, json TEXT, created_at INTEGER)`)
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)`)
     ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS images (id TEXT PRIMARY KEY, client_id TEXT, mime TEXT, bytes BLOB, created_at INTEGER)`)
+    // When the stylist changes something the photo reader said: what it said, what's right.
+    ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS reader_fixes (field TEXT, said TEXT, now TEXT, created_at INTEGER)`)
     // Rooms created before photos existed get the column in place.
     const cols = ctx.storage.sql.exec(`PRAGMA table_info(messages)`).toArray().map((c) => c.name)
     if (!cols.includes("images")) ctx.storage.sql.exec(`ALTER TABLE messages ADD COLUMN images TEXT`)
@@ -150,6 +152,18 @@ export class StylistRoom extends DurableObject<Env> {
     this.broadcast({ type: "message", message: m })
   }
 
+  // The stylist's most recent photo corrections, one per field and wrong tag.
+  private readerFixes(): ReaderFix[] {
+    const rows = this.ctx.storage.sql.exec(`SELECT field, said, now FROM reader_fixes ORDER BY created_at DESC LIMIT 40`).toArray()
+    const seen = new Set<string>()
+    return rows.flatMap((r) => {
+      const key = `${r.field}:${r.said}`
+      if (seen.has(key)) return []
+      seen.add(key)
+      return [{ field: r.field as string, said: r.said as string, now: r.now as string }]
+    })
+  }
+
   private correctionPool(): Correction[] {
     const live = this.ctx.storage.sql.exec(`SELECT json FROM corrections ORDER BY created_at`).toArray().map((r) => JSON.parse(r.json as string))
     return [...parseJsonl(PROFILES[this.stylist!].seedCorrections), ...live]
@@ -203,7 +217,7 @@ export class StylistRoom extends DurableObject<Env> {
         const r = this.ctx.storage.sql.exec(`SELECT mime, bytes FROM images WHERE id = ?`, id).toArray()[0]
         return r ? [{ mime: r.mime as string, bytes: r.bytes as ArrayBuffer }] : []
       })
-      m = { ...m, photoTags: await readPhotos({ key: this.env.MUBIT_API_KEY, tags: tags as any, photos }).catch(() => null) }
+      m = { ...m, photoTags: await readPhotos({ key: this.env.MUBIT_API_KEY, tags: tags as any, photos, fixes: this.readerFixes() }).catch(() => null) }
       this.save(m)
     }
     const used = closestCorrections(m.text, this.correctionPool())
@@ -222,7 +236,9 @@ export class StylistRoom extends DurableObject<Env> {
     const brief = result.brief as Record<string, any> | null
     const trusted = new Set((m.photoTags ?? []).filter((t) => t.confidence >= (tags as any).trust_threshold).map((t) => t.field))
     if (brief && m.photoTags) {
-      applyTrustedPhotoTags(brief, m.photoTags, (tags as any).trust_threshold)
+      // A tag the stylist has corrected away is never put back by the photo rule.
+      const vetoed = new Set(this.readerFixes().map((f) => `${f.field}:${f.said}`))
+      applyTrustedPhotoTags(brief, m.photoTags.filter((t) => !vetoed.has(`${t.field}:${t.tag}`)), (tags as any).trust_threshold)
       // A field the photo now answers is no longer something to ask about.
       if (Array.isArray(brief.missing)) brief.missing = brief.missing.filter((k: string) => brief.look?.[k] === undefined || brief.look[k] === "unknown")
     }
@@ -250,6 +266,9 @@ export class StylistRoom extends DurableObject<Env> {
       corrected: body.corrected, changed,
     }
     this.ctx.storage.sql.exec(`INSERT OR REPLACE INTO corrections VALUES (?, ?, ?)`, m.id, JSON.stringify(correction), Date.now())
+    for (const f of readerFixes(m.photoTags, m.brief, body.corrected, (PROFILES[this.stylist!].tags as any).trust_threshold)) {
+      this.ctx.storage.sql.exec(`INSERT INTO reader_fixes VALUES (?, ?, ?, ?)`, f.field, f.said, f.now, Date.now())
+    }
     this.save({ ...m, corrected: body.corrected, changed })
     return Response.json({ changed })
   }
@@ -305,9 +324,32 @@ export class StylistRoom extends DurableObject<Env> {
     this.ctx.storage.sql.exec(`DELETE FROM messages`)
     this.ctx.storage.sql.exec(`DELETE FROM corrections`)
     this.ctx.storage.sql.exec(`DELETE FROM images`)
+    this.ctx.storage.sql.exec(`DELETE FROM reader_fixes`)
     this.broadcast({ type: "reset" })
     return Response.json({ ok: true })
   }
+}
+
+// Which trusted photo tags the stylist overruled in a correction. A scalar field counts when
+// the stylist changed what the photo put there; an extra counts when the stylist removed it,
+// paired with whatever extra they added instead ("none" if they only removed it).
+function readerFixes(tags: RoomMessage["photoTags"], before: any, after: any, threshold: number): ReaderFix[] {
+  const out: ReaderFix[] = []
+  for (const t of tags ?? []) {
+    if (t.confidence < threshold) continue
+    if (t.field === "service") {
+      if (before?.service === t.tag && after?.service !== t.tag) out.push({ field: "service", said: t.tag, now: String(after?.service ?? "unknown") })
+      continue
+    }
+    const was = before?.look?.[t.field]
+    const is = after?.look?.[t.field]
+    if (Array.isArray(was) && Array.isArray(is)) {
+      if (was.includes(t.tag) && !is.includes(t.tag)) out.push({ field: t.field, said: t.tag, now: is.find((x: string) => !was.includes(x)) ?? "none" })
+    } else if (was === t.tag && is !== t.tag) {
+      out.push({ field: t.field, said: t.tag, now: String(is ?? "unknown") })
+    }
+  }
+  return out
 }
 
 // Reads a request body as it arrives and gives up once it passes `limit`, so an oversized or

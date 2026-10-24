@@ -200,6 +200,21 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
   const price = estimate(stylist, brief)
   const threshold = 0.6
 
+  const toggleExtra = async (extra: string, on: boolean) => {
+    if (!brief) return
+    const next = structuredClone(brief)
+    const list: string[] = next.look?.extras ?? []
+    next.look.extras = on ? [...list, extra] : list.filter((x) => x !== extra)
+    setError('')
+    try {
+      await post(stylist, 'correct', { id: m.id, corrected: next }, token)
+      setSaved(`Extras fixed. Sent to Mubit.`)
+      setTimeout(() => setSaved(''), 2600)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That correction didn’t save.')
+    }
+  }
+
   const correct = async (path: string, value: string, label: string) => {
     if (!brief) return
     const next = structuredClone(brief)
@@ -299,6 +314,24 @@ function Detail({ m, stylist, token, onBack }: { m: RoomMessage; stylist: Stylis
               <div key={s.title} className="block">
                 <h3 className="eyebrow">{s.title}</h3>
                 {s.fields.map(select)}
+                {s.title === 'Look' && stylist === 'braider' && (
+                  <div className="line extras">
+                    <span className="k">Extras</span>
+                    <span className="v">
+                      {braiderTags.fields.extras.map((x) => {
+                        const on = (brief.look?.extras ?? []).includes(x)
+                        const was = (m.brief?.look?.extras ?? []).includes(x)
+                        const changed = !!m.corrected && on !== was
+                        return (
+                          <label key={x} className={changed ? (on ? 'tick added' : 'tick removed') : 'tick'}>
+                            <input type="checkbox" checked={on} onChange={() => toggleExtra(x, !on)} />
+                            {words(x)}
+                          </label>
+                        )
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -431,6 +464,13 @@ const CSS = `
 .line.fixed select { color: var(--good); }
 .line s { color: var(--bad); }
 .line.unsure { opacity: 0.6; }
+.extras { align-items: start; }
+.extras .v { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.tick { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); cursor: pointer; min-height: 32px; }
+.tick input { accent-color: var(--accent); width: 18px; height: 18px; }
+.tick:has(input:checked) { color: var(--ink); font-weight: 600; }
+.tick.added { color: var(--good); }
+.tick.removed { color: var(--bad); text-decoration: line-through; }
 .ask { margin: 0 0 6px; padding-left: 18px; display: grid; gap: 4px; }
 .drafted { font-size: 12px; line-height: 1.5; margin-top: auto; overflow-wrap: anywhere; }
 /* Smaller iPad: the thread and the sheet stack in one scrolling column beside the list. */
