@@ -1,0 +1,43 @@
+{
+  "capturedAt": "2026-10-24T10:44:49.755Z",
+  "hero": {
+    "dm": "can u do these? saturday",
+    "tags": [
+      {
+        "field": "service",
+        "tag": "knotless",
+        "conf": 90
+      },
+      {
+        "field": "length",
+        "tag": "butt",
+        "conf": 75
+      },
+      {
+        "field": "size",
+        "tag": "medium",
+        "conf": 83
+      }
+    ],
+    "firstSize": "medium",
+    "firstReply": "Hiya hun yes I can 💕 These would be £200, hair isn't included. What time were you hoping for Saturday? Amara x",
+    "plainReply": "I can do this knotless look for £200 at butt length, medium size. Hair isn’t included. Would you like me to send my available slots for Saturday 31 October?",
+    "fixedSize": "smedium",
+    "fixedReply": "Hiya hun yes I can 💕 These would be £220, hair isn’t included. I’ll check Saturday availability and send you some slots. Amara x"
+  },
+  "followUp": {
+    "dm": "does that include the hair?",
+    "reply": "Hiya lovely, hair isn't included but I can bring it for £15 extra, so it’d be £235 altogether 💕 Amara x"
+  },
+  "nextClient": {
+    "dm": "how much for these? next sat",
+    "size": "smedium",
+    "reply": "Hiya lovely 💕 Smedium knotless to butt length is £220, hair not included hun. Would you like me to offer you some slots for next Saturday? Amara x"
+  },
+  "budget": {
+    "dm": "can i get small knotless to my waist? budget is £150 max, saturday",
+    "reply": "Hiya lovely, small waist knotless would be £210, with hair not included. To stay within your £150 budget, I could do large waist knotless for £150 💕 Would you like me to offer you a slot for Saturday? Amara x",
+    "plain": "Hi lovely! Small waist-length knotless braids are £210, with hair not included. To stay within your £150 budget, I could do waist-length large knotless braids for £150, also excluding hair. Would you like that option?",
+    "fixedReply": "Hiya lovely, large knotless to waist would be £150, hair isn't included 💕 Amara x"
+  }
+}

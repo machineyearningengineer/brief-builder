@@ -207,6 +207,12 @@ export class StylistRoom extends DurableObject<Env> {
     return out
   }
 
+  // Every value in her tag list, masked out of voice examples.
+  private voiceTerms(): string[] {
+    const fields = (PROFILES[this.stylist!].tags as any).fields as Record<string, string[]>
+    return [...new Set(Object.values(fields).flat().filter((t) => t.length > 2))]
+  }
+
   private voicePool(): VoiceEdit[] {
     const live = this.ctx.storage.sql.exec(`SELECT dm, draft, sent FROM voice ORDER BY created_at`).toArray() as unknown as VoiceEdit[]
     return [...parseJsonl<VoiceEdit>(PROFILES[this.stylist!].seedVoice), ...live]
@@ -290,7 +296,7 @@ export class StylistRoom extends DurableObject<Env> {
     // the before-and-after. The plain call is never recorded, so it can't train the adapter.
     // Both see the client's conversation so far, so a follow-up continues the same brief.
     const [result, plain] = await Promise.all([
-      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, corrections: correctionsBlock(used) + voiceBlock(closestVoice(m.text, this.voicePool())) + settledBlock(history.at(-1)?.brief ?? null) }).catch(failed),
+      callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, corrections: correctionsBlock(used) + voiceBlock(closestVoice(m.text, this.voicePool()), this.voiceTerms()) + settledBlock(history.at(-1)?.brief ?? null) }).catch(failed),
       callBrief({ key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low", dm, history, record: "off" }).catch(failed),
     ])
     const plainBrief = plain.brief as Record<string, any> | null
@@ -365,7 +371,7 @@ export class StylistRoom extends DurableObject<Env> {
     const result = await callBrief({
       key: this.env.MUBIT_API_KEY, profile: profile as any, tags: tags as any, effort: "low",
       dm: { received_at: m.receivedAt, text: m.text, photo: m.photoTags ? { reader_output: m.photoTags } : null },
-      corrections: correctionsBlock([...own, ...others]) + voiceBlock(closestVoice(m.text, this.voicePool())),
+      corrections: correctionsBlock([...own, ...others]) + voiceBlock(closestVoice(m.text, this.voicePool()), this.voiceTerms()),
       history: this.history(m),
     }).catch(() => null)
     const latest = this.message(id)

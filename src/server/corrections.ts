@@ -49,10 +49,23 @@ export function closestVoice(text: string, pool: VoiceEdit[], k = 2): VoiceEdit[
   return scored.sort((a, b) => b.score - a.score).slice(0, k).map((s) => s.v)
 }
 
-export function voiceBlock(vs: VoiceEdit[]): string {
+// Voice examples teach how she writes, never what to quote: prices, times and the words for
+// services, sizes and lengths are masked, so a past client's "medium, mid-back, £140" can't leak
+// into a new reply.
+export function maskFacts(text: string, terms: string[]): string {
+  let out = text.replace(/£\s?\d+(?:\.\d+)?/g, "£[price]").replace(/\b\d{1,2}(?::\d{2})?\s?(?:am|pm)\b/gi, "[time]")
+  for (const t of [...terms].sort((a, b) => b.length - a.length)) {
+    const pattern = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[_ -]+/g, "[ _-]?")
+    out = out.replace(new RegExp(`\\b${pattern}\\b`, "gi"), "[detail]")
+  }
+  return out
+}
+
+export function voiceBlock(vs: VoiceEdit[], terms: string[] = []): string {
   if (!vs.length) return ""
-  const shown = vs.map((v) => `- DM: ${JSON.stringify(v.dm)}\n  Draft: ${JSON.stringify(v.draft)}\n  She sent: ${JSON.stringify(v.sent)}`)
-  return `\n\nHow this stylist rewrites drafts before sending. Write reply_draft the way she does (greeting, tone, emoji, sign-off), keeping the prices and facts from the brief:\n${shown.join("\n")}`
+  const m = (s: string) => JSON.stringify(maskFacts(s, terms))
+  const shown = vs.map((v) => `- DM: ${m(v.dm)}\n  Draft: ${m(v.draft)}\n  She sent: ${m(v.sent)}`)
+  return `\n\nHow this stylist rewrites drafts before sending. Copy only her way of writing (greeting, tone, emoji, sign-off); every price, size, length and service in your reply comes from this DM and the brief:\n${shown.join("\n")}`
 }
 
 // Word-level share of a draft the stylist changed: 0 when sent as drafted, 1 when rewritten.
