@@ -1,5 +1,5 @@
 // The projector view, read left to right at 1920×1080: the measured result, then the live room.
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import scoreboard from '../shared/scoreboard.json'
 import { imageUrlForStylist, stylistToken, useRoom } from '../client/room.ts'
@@ -10,9 +10,11 @@ import { Tip } from '../client/tip.tsx'
 import braiderProfile from '../../data/braider/profile.json'
 import colouristProfile from '../../data/colourist/profile.json'
 import nailsProfile from '../../data/nails/profile.json'
-import { STYLISTS, type StylistKey } from '../shared/stylists.ts'
+import { STYLISTS, isStylist, type StylistKey } from '../shared/stylists.ts'
 
 export const Route = createFileRoute('/stage')({
+  // The chosen stylist lives in the link, so a reload or a bookmark keeps it.
+  validateSearch: (search: Record<string, unknown>): { s?: StylistKey } => (typeof search.s === 'string' && isStylist(search.s) ? { s: search.s } : {}),
   head: () => ({ meta: [{ title: 'Stage · Brief Builder' }] }),
   component: Stage,
 })
@@ -63,8 +65,11 @@ const say = (v: unknown) => {
 }
 
 function Stage() {
-  const [stylist, setStylist] = useState<StylistKey>('braider')
+  const stylist = Route.useSearch().s ?? 'braider'
+  const navigate = useNavigate({ from: '/stage' })
+  const setStylist = (s: StylistKey) => navigate({ search: { s }, replace: true })
   const [token, setToken] = useState('')
+  const [draftKey, setDraftKey] = useState('')
   const [origin, setOrigin] = useState('')
   useEffect(() => {
     setToken(stylistToken.get())
@@ -101,7 +106,15 @@ function Stage() {
       </section>
 
       <section className="room" aria-live="polite">
-        {!token && <p className="muted">Open {first}’s inbox once on this laptop to connect.</p>}
+        {!token && (
+          <form className="connect" onSubmit={(e) => { e.preventDefault(); stylistToken.set(draftKey.trim()); setToken(draftKey.trim()) }}>
+            <label htmlFor="stage-key">Enter the stylist key to show DMs live</label>
+            <span>
+              <input id="stage-key" type="password" autoComplete="off" placeholder="Stylist key" value={draftKey} onChange={(e) => setDraftKey(e.target.value)} />
+              <button className="btn primary" type="submit" disabled={!draftKey.trim()}>Connect</button>
+            </span>
+          </form>
+        )}
         {latest ? (
           <>
             <Latest m={latest} photo={[...messages].reverse().find((x) => x.clientId === latest.clientId && x.images.length)?.images[0]} stylist={stylist} token={token} first={first} />
@@ -276,6 +289,10 @@ const STAGE_CSS = `
 .join b { font-family: var(--display); font-size: 34px; letter-spacing: -0.02em; margin-top: 8px; }
 .join .mono { font-size: 17px; }
 .room { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.connect { display: grid; gap: 8px; padding: 16px; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); }
+.connect label { font-weight: 600; }
+.connect span { display: flex; gap: 8px; }
+.connect input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--bg); }
 .waiting { flex: 1; max-height: 420px; display: grid; place-items: center; text-align: center; padding: 32px; border: 2px dashed var(--line); border-radius: 28px; color: var(--muted); font-size: 22px; }
 .latest { display: grid; gap: 16px; padding: 22px; border-radius: 28px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .latest .dm { display: flex; gap: 18px; align-items: flex-start; }
